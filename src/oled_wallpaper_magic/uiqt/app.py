@@ -572,10 +572,19 @@ class ConfigPanelMixin:
                 self._lock_state = merged
             batch_rand = data.get("randomize_on_generate")
             if isinstance(batch_rand, bool):
+                self.randomize_on_generate.blockSignals(True)
                 self.randomize_on_generate.setChecked(batch_rand)
+                self.randomize_on_generate.blockSignals(False)
             preview_rand = data.get("randomize_per_preview")
             if isinstance(preview_rand, bool):
+                self.randomize_per_preview_chk.blockSignals(True)
                 self.randomize_per_preview_chk.setChecked(preview_rand)
+                self.randomize_per_preview_chk.blockSignals(False)
+            preset_name = data.get("preset_name")
+            if isinstance(preset_name, str) and preset_name:
+                self.preset_combo.blockSignals(True)
+                self.preset_combo.setCurrentText(preset_name)
+                self.preset_combo.blockSignals(False)
             self._refresh_lock_buttons()
             self._sync_form_from_config()
         except Exception:
@@ -595,6 +604,7 @@ class ConfigPanelMixin:
                 "randomize_on_generate": self.randomize_on_generate.isChecked(),
                 "randomize_per_preview": self.randomize_per_preview_chk.isChecked(),
                 "last_preview_save_dir": str(self._last_preview_save_dir),
+                "preset_name": self.preset_combo.currentText(),
             }
             self._ui_state_path.parent.mkdir(parents=True, exist_ok=True)
             self._ui_state_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -849,7 +859,8 @@ class PreviewMixin:
             return
         self._apply_form_to_config()
         self._preview_seed_override = None
-        self.preview_timer.start()
+        if hasattr(self, 'preview_timer'):
+            self.preview_timer.start()
 
     def _render_previews(self) -> None:
         if self._preview_seed_override is not None:
