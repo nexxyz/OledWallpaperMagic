@@ -854,6 +854,7 @@ class PreviewMixin:
         else:
             seed = self.config.seed if self.config.seed is not None else self._base_seed
         self._preview_seeds = [seed + i for i in range(4)]
+        self._preview_configs = []
         for i, lbl in enumerate(self.preview_labels):
             preview_cfg = self.config
             if self.randomize_per_preview_chk.isChecked():
@@ -862,6 +863,7 @@ class PreviewMixin:
                     self._lock_state,
                     random.Random(self._preview_seeds[i]),
                 )
+            self._preview_configs.append(preview_cfg.model_copy(deep=True))
             pix = render_preview_pixmap(
                 preview_cfg,
                 self._preview_seeds[i],
@@ -898,6 +900,21 @@ class PreviewMixin:
             QMessageBox.critical(self, "Save failed", f"Could not save preview to:\n{out_path}")
             return
         self._last_preview_save_dir = Path(out_path).parent
+
+    def freeze_preview_params(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._preview_configs):
+            return
+        self.config = self._preview_configs[idx].model_copy(deep=True)
+        for key in self._lock_state:
+            self._lock_state[key] = True
+        self._refresh_lock_buttons()
+        self._sync_form_from_config()
+        QMessageBox.information(
+            self,
+            "Parameters Frozen",
+            f"Preview {idx + 1} parameters applied to config and all parameters locked.",
+        )
+        self.schedule_preview()
 
 
 class GenerationMixin:
@@ -1025,6 +1042,7 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self._base_seed = random.randint(0, DEFAULT_SEED_RANGE)
         self._preview_seed_override: int | None = None
         self._preview_seeds: list[int] = [self._base_seed + i for i in range(4)]
+        self._preview_configs: list[AppConfig] = [self.config.model_copy(deep=True) for _ in range(4)]
         self._last_preview_save_dir = Path.cwd()
         self._locks_path = Path.home() / ".config" / "oled_wallpaper_magic" / "randomization_locks.json"
         self._ui_state_path = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_state.json"
@@ -1073,11 +1091,26 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
             lbl.setStyleSheet("background:#111; border:1px solid #333;")
             lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
 
-            save_btn = QPushButton(f"Save Preview {i + 1}")
+            btn_row = QWidget()
+            btn_layout = QHBoxLayout(btn_row)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setSpacing(4)
+
+            save_btn = QPushButton(f"Save")
+            save_btn.setFixedWidth(60)
             save_btn.clicked.connect(lambda _=False, idx=i: self.save_full_size_preview(idx))
+            save_btn.setToolTip(f"Save Preview {i + 1} at full configured resolution.")
+
+            freeze_btn = QPushButton("Freeze")
+            freeze_btn.setFixedWidth(60)
+            freeze_btn.clicked.connect(lambda _=False, idx=i: self.freeze_preview_params(idx))
+            freeze_btn.setToolTip(f"Apply Preview {i + 1} parameters to config and lock all.")
+
+            btn_layout.addWidget(save_btn)
+            btn_layout.addWidget(freeze_btn)
 
             tile_layout.addWidget(lbl, 1)
-            tile_layout.addWidget(save_btn)
+            tile_layout.addWidget(btn_row)
 
             self.preview_labels.append(lbl)
             self.preview_save_buttons.append(save_btn)
