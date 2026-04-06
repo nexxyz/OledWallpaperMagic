@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
-from typing import Callable
 
 
 def linear_alpha(t: np.ndarray, k: float) -> np.ndarray:

@@ -1,13 +1,13 @@
 import numpy as np
 
-from oledwall.generator.palette import hsv_to_rgb, rgb_to_hsv, random_vivid_color, ensure_hue_separation
-from oledwall.generator.fuzzy_circle import (
+from oled_wallpaper_magic.generator.palette import hsv_to_rgb, rgb_to_hsv, random_vivid_color, ensure_hue_separation
+from oled_wallpaper_magic.generator.fuzzy_circle import (
     linear_alpha, ease_alpha, exp_alpha, gaussian_alpha, flat_alpha,
     glow_ring_alpha, get_alpha_curve,
 )
-from oledwall.generator.circle import FuzzyCircle
-from oledwall.generator.engine import GenerationEngine
-from oledwall.config import AppConfig, Resolution
+from oled_wallpaper_magic.generator.circle import FuzzyCircle
+from oled_wallpaper_magic.generator.engine import GenerationEngine
+from oled_wallpaper_magic.config import AppConfig, Resolution
 
 
 def test_hsv_roundtrip():
@@ -70,7 +70,7 @@ def test_get_alpha_curve_invalid():
 
 
 def test_determinism():
-    from oledwall.config import ColorConfig
+    from oled_wallpaper_magic.config import ColorConfig
 
     config = AppConfig(
         resolution=Resolution(width=320, height=180),
@@ -91,7 +91,7 @@ def test_determinism():
 
 
 def test_different_seeds_different_output():
-    from oledwall.config import ColorConfig
+    from oled_wallpaper_magic.config import ColorConfig
 
     config = AppConfig(
         resolution=Resolution(width=320, height=180),
@@ -112,7 +112,7 @@ def test_different_seeds_different_output():
 
 
 def test_parallel_batch_yields_correct_count():
-    from oledwall.config import ColorConfig
+    from oled_wallpaper_magic.config import ColorConfig
 
     config = AppConfig(
         resolution=Resolution(width=160, height=90),
@@ -133,7 +133,7 @@ def test_parallel_batch_yields_correct_count():
 
 
 def test_config_validation_min_max():
-    from oledwall.config import GenerationConfig
+    from oled_wallpaper_magic.config import GenerationConfig
     from pydantic import ValidationError
 
     ok = GenerationConfig(min_circles=1, max_circles=5)

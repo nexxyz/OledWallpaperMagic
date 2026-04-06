@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+import contextlib
 import importlib
 import json
 import random
 from pathlib import Path
+
+from oled_wallpaper_magic.config import (
+    DEFAULT_SEED_RANGE,
+    AppConfig,
+    ColorConfig,
+    GenerationConfig,
+    parse_color,
+)
+from oled_wallpaper_magic.generator.engine import GenerationEngine
+from oled_wallpaper_magic.presets import preset_store
+from oled_wallpaper_magic.session.manager import SessionManager
+from oled_wallpaper_magic.uiqt.preview import render_preview_pixmap
+from oled_wallpaper_magic.uiqt.review import ReviewWindow
 
 _qt_pkg = "".join(["Py", "Side6"])
 QtCore = importlib.import_module(".".join([_qt_pkg, "Qt" + "Core"]))
@@ -40,13 +54,6 @@ QSplitter = QtWidgets.QSplitter
 QToolButton = QtWidgets.QToolButton
 QVBoxLayout = QtWidgets.QVBoxLayout
 QWidget = QtWidgets.QWidget
-
-from oledwall.config import AppConfig, ColorConfig, GenerationConfig, parse_color
-from oledwall.generator.engine import GenerationEngine
-from oledwall.presets import preset_store
-from oledwall.session.manager import SessionManager
-from oledwall.uiqt.preview import render_preview_pixmap
-from oledwall.uiqt.review import ReviewWindow
 
 
 def _random_hex(rng: random.Random) -> str:
@@ -103,7 +110,7 @@ def _randomize_config_unlocked(base: AppConfig, locks: dict[str, bool], rng: ran
         cfg.colors.secondary_is_random = False
 
     if unlocked("seed"):
-        cfg.seed = rng.randint(0, 2**31 - 1)
+        cfg.seed = rng.randint(0, DEFAULT_SEED_RANGE)
 
     return cfg
 
@@ -137,7 +144,7 @@ class GenerationThread(QThread):
             generated = session.root / "generated"
             generated.mkdir(parents=True, exist_ok=True)
 
-            seed = self.cfg.seed if self.cfg.seed is not None else random.randint(0, 2**31 - 1)
+            seed = self.cfg.seed if self.cfg.seed is not None else random.randint(0, DEFAULT_SEED_RANGE)
             if self.randomize_unlocked_per_image:
                 rng = random.Random(seed)
                 for i in range(len(session.images)):
@@ -174,102 +181,8 @@ class GenerationThread(QThread):
             self.failed.emit(str(exc))
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("oledwall")
-        self.resize(1400, 900)
-        self.config = AppConfig()
-        self._apply_default_style()
-        self.config.generation.workers = 0
-        self._base_seed = random.randint(0, 2**31 - 1)
-        self._preview_seed_override: int | None = None
-        self._preview_seeds: list[int] = [self._base_seed + i for i in range(4)]
-        self._last_preview_save_dir = Path.cwd()
-        self._locks_path = Path.home() / ".config" / "oledwall" / "randomization_locks.json"
-        self._ui_state_path = Path.home() / ".config" / "oledwall" / "ui_state.json"
-        self._ui_presets_dir = Path.home() / ".config" / "oledwall" / "ui_presets"
-        self._lock_state: dict[str, bool] = self._load_lock_state()
-        self._lock_buttons: dict[str, QToolButton] = {}
-        self._preset_lookup: dict[str, tuple[str, str]] = {}
-        self._loading_form = False
-
-        central = QWidget(self)
-        self.setCentralWidget(central)
-        root_layout = QHBoxLayout(central)
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        root_layout.addWidget(splitter)
-
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setMinimumWidth(520)
-        left_inner = QWidget()
-        self.form = QFormLayout(left_inner)
-        self.form.setSpacing(10)
-        self.scroll.setWidget(left_inner)
-        splitter.addWidget(self.scroll)
-
-        self.lock_all_btn = QPushButton("Lock All")
-        self.unlock_all_btn = QPushButton("Unlock All")
-        self.save_preset_btn = QPushButton("Save Preset")
-        self.load_preset_btn = QPushButton("Load Preset")
-
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        self.preview_grid = QGridLayout()
-        self.preview_grid.setSpacing(8)
-        self.preview_labels: list[QLabel] = []
-        self.preview_save_buttons: list[QPushButton] = []
-        for i in range(4):
-            tile = QWidget()
-            tile_layout = QVBoxLayout(tile)
-            tile_layout.setContentsMargins(0, 0, 0, 0)
-            tile_layout.setSpacing(6)
-
-            lbl = QLabel("Preview")
-            lbl.setMinimumSize(300, 180)
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet("background:#111; border:1px solid #333;")
-            lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-
-            save_btn = QPushButton(f"Save Preview {i + 1}")
-            save_btn.clicked.connect(lambda _=False, idx=i: self.save_full_size_preview(idx))
-
-            tile_layout.addWidget(lbl, 1)
-            tile_layout.addWidget(save_btn)
-
-            self.preview_labels.append(lbl)
-            self.preview_save_buttons.append(save_btn)
-            self.preview_grid.addWidget(tile, i // 2, i % 2)
-        right_layout.addLayout(self.preview_grid)
-
-        tools_row = QWidget()
-        tools_layout = QHBoxLayout(tools_row)
-        tools_layout.setContentsMargins(0, 0, 0, 0)
-        self.shuffle_preview_btn = QPushButton("Shuffle Preview Seeds")
-        tools_layout.addWidget(self.shuffle_preview_btn)
-        tools_layout.addStretch(1)
-        right_layout.addWidget(tools_row)
-
-        self.randomize_per_preview_chk = QCheckBox("Randomize unlocked for each preview")
-        right_layout.addWidget(self.randomize_per_preview_chk)
-
-        splitter.addWidget(right)
-        splitter.setSizes([520, 880])
-
-        self._build_controls()
-        self._load_ui_state()
-
-        self.preview_timer = QTimer(self)
-        self.preview_timer.setSingleShot(True)
-        self.preview_timer.setInterval(150)
-        self.preview_timer.timeout.connect(self._render_previews)
-
-        self._generation_thread: GenerationThread | None = None
-        self._progress = None
-
-        self.schedule_preview()
+class ConfigPanelMixin:
+    """Mixin providing config panel UI building and management."""
 
     def _build_controls(self) -> None:
         self.width_spin = self._spin(640, 7680, self.config.resolution.width)
@@ -500,7 +413,10 @@ class MainWindow(QMainWindow):
         self.workers_spin.setToolTip("Parallel worker count for generation (0 = auto / all cores).")
         self.generate_btn.setToolTip("Generate a batch and open review for the session.")
         self.open_btn.setToolTip("Open an existing saved session for review.")
-        self.cleanup_btn.setToolTip("Delete all session folders in the temp directory (keeps your saved wallpapers).")
+        self.cleanup_btn.setToolTip(
+            "Delete all session folders in the temp directory "
+            "(keeps your saved wallpapers)."
+        )
 
         self.shuffle_preview_btn.setToolTip("Change preview seeds without changing any settings.")
         self.randomize_per_preview_chk.setToolTip(
@@ -632,9 +548,20 @@ class MainWindow(QMainWindow):
             data = json.loads(self._ui_state_path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 return
+
             cfg_data = data.get("config")
             if isinstance(cfg_data, dict):
-                self.config = AppConfig.model_validate(cfg_data)
+                with contextlib.suppress(Exception):
+                    self.config = AppConfig.model_validate(cfg_data)
+
+            explicit_res = data.get("resolution")
+            if isinstance(explicit_res, dict):
+                width = explicit_res.get("width")
+                height = explicit_res.get("height")
+                if isinstance(width, int) and isinstance(height, int):
+                    self.config.resolution.width = width
+                    self.config.resolution.height = height
+
             save_dir = data.get("last_preview_save_dir")
             if isinstance(save_dir, str) and save_dir:
                 self._last_preview_save_dir = Path(save_dir)
@@ -660,6 +587,11 @@ class MainWindow(QMainWindow):
         try:
             self._apply_form_to_config()
             payload = {
+                "version": 1,
+                "resolution": {
+                    "width": self.config.resolution.width,
+                    "height": self.config.resolution.height,
+                },
                 "config": self.config.model_dump(mode="json"),
                 "locks": self._lock_state,
                 "randomize_on_generate": self.randomize_on_generate.isChecked(),
@@ -832,35 +764,6 @@ class MainWindow(QMainWindow):
         self._sync_form_from_config()
         self.schedule_preview()
 
-    def shuffle_preview_seeds(self) -> None:
-        self._preview_seed_override = random.randint(0, 2**31 - 1)
-        self.preview_timer.start()
-
-    def save_full_size_preview(self, idx: int) -> None:
-        self._apply_form_to_config()
-        if idx < 0 or idx >= 4:
-            idx = 0
-        if not self._preview_seeds:
-            self._render_previews()
-        seed = self._preview_seeds[idx]
-        res = self.config.resolution
-        pix = render_preview_pixmap(self.config, seed, res.width, res.height)
-
-        suggested = self._last_preview_save_dir / f"preview_{idx + 1}_{res.width}x{res.height}.png"
-        out_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Full-Size Preview",
-            str(suggested),
-            "PNG Images (*.png)",
-        )
-        if not out_path:
-            return
-        ok = pix.save(out_path, "PNG")
-        if not ok:
-            QMessageBox.critical(self, "Save failed", f"Could not save preview to:\n{out_path}")
-            return
-        self._last_preview_save_dir = Path(out_path).parent
-
     def _spin(self, lo: int, hi: int, value: int) -> QSpinBox:
         w = QSpinBox()
         w.setRange(lo, hi)
@@ -885,7 +788,8 @@ class MainWindow(QMainWindow):
         self.config.resolution.width = self.width_spin.value()
         self.config.resolution.height = self.height_spin.value()
         self.config.session.count = self.count_spin.value()
-        self.config.session.save_dir = Path(self.save_dir_edit.text().strip() or str(self.config.session.save_dir))
+        save_dir_text = self.save_dir_edit.text().strip()
+        self.config.session.save_dir = Path(save_dir_text or str(self.config.session.save_dir))
 
         g = self.config.generation
         g.min_circles = self.min_circles.value()
@@ -933,6 +837,10 @@ class MainWindow(QMainWindow):
         seed_text = self.seed_edit.text().strip()
         self.config.seed = int(seed_text) if seed_text else None
 
+
+class PreviewMixin:
+    """Mixin providing preview rendering functionality."""
+
     def schedule_preview(self) -> None:
         if self._loading_form:
             return
@@ -962,15 +870,47 @@ class MainWindow(QMainWindow):
             )
             lbl.setPixmap(pix)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
+    def shuffle_preview_seeds(self) -> None:
+        self._preview_seed_override = random.randint(0, DEFAULT_SEED_RANGE)
         self.preview_timer.start()
+
+    def save_full_size_preview(self, idx: int) -> None:
+        self._apply_form_to_config()
+        if idx < 0 or idx >= 4:
+            idx = 0
+        if not self._preview_seeds:
+            self._render_previews()
+        seed = self._preview_seeds[idx]
+        res = self.config.resolution
+        pix = render_preview_pixmap(self.config, seed, res.width, res.height)
+
+        suggested = self._last_preview_save_dir / f"preview_{idx + 1}_{res.width}x{res.height}.png"
+        out_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Full-Size Preview",
+            str(suggested),
+            "PNG Images (*.png)",
+        )
+        if not out_path:
+            return
+        ok = pix.save(out_path, "PNG")
+        if not ok:
+            QMessageBox.critical(self, "Save failed", f"Could not save preview to:\n{out_path}")
+            return
+        self._last_preview_save_dir = Path(out_path).parent
+
+
+class GenerationMixin:
+    """Mixin providing generation and batch processing."""
 
     def start_generation(self) -> None:
         self._apply_form_to_config()
         if self._generation_thread and self._generation_thread.isRunning():
             return
-        self._progress = QProgressDialog("Generating wallpapers...", "Cancel", 0, self.config.session.count, self)
+        total_count = self.config.session.count
+        self._progress = QProgressDialog(
+            "Generating wallpapers...", "Cancel", 0, total_count, self
+        )
         self._progress.setWindowTitle("Generation")
         self._progress.setWindowModality(Qt.WindowModality.WindowModal)
         self._progress.canceled.connect(self._cancel_generation)
@@ -1072,6 +1012,108 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         QMessageBox.information(self, "Cleanup Complete", f"Deleted {deleted} session folder(s).")
+
+
+class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("OledWallpaperMagic")
+        self.resize(1400, 900)
+        self.config = AppConfig()
+        self._apply_default_style()
+        self.config.generation.workers = 0
+        self._base_seed = random.randint(0, DEFAULT_SEED_RANGE)
+        self._preview_seed_override: int | None = None
+        self._preview_seeds: list[int] = [self._base_seed + i for i in range(4)]
+        self._last_preview_save_dir = Path.cwd()
+        self._locks_path = Path.home() / ".config" / "oled_wallpaper_magic" / "randomization_locks.json"
+        self._ui_state_path = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_state.json"
+        self._ui_presets_dir = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_presets"
+        self._lock_state: dict[str, bool] = self._load_lock_state()
+        self._lock_buttons: dict[str, QToolButton] = {}
+        self._preset_lookup: dict[str, tuple[str, str]] = {}
+        self._loading_form = False
+
+        central = QWidget(self)
+        self.setCentralWidget(central)
+        root_layout = QHBoxLayout(central)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        root_layout.addWidget(splitter)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setMinimumWidth(520)
+        left_inner = QWidget()
+        self.form = QFormLayout(left_inner)
+        self.form.setSpacing(10)
+        self.scroll.setWidget(left_inner)
+        splitter.addWidget(self.scroll)
+
+        self.lock_all_btn = QPushButton("Lock All")
+        self.unlock_all_btn = QPushButton("Unlock All")
+        self.save_preset_btn = QPushButton("Save Preset")
+        self.load_preset_btn = QPushButton("Load Preset")
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        self.preview_grid = QGridLayout()
+        self.preview_grid.setSpacing(8)
+        self.preview_labels: list[QLabel] = []
+        self.preview_save_buttons: list[QPushButton] = []
+        for i in range(4):
+            tile = QWidget()
+            tile_layout = QVBoxLayout(tile)
+            tile_layout.setContentsMargins(0, 0, 0, 0)
+            tile_layout.setSpacing(6)
+
+            lbl = QLabel("Preview")
+            lbl.setMinimumSize(300, 180)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet("background:#111; border:1px solid #333;")
+            lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
+            save_btn = QPushButton(f"Save Preview {i + 1}")
+            save_btn.clicked.connect(lambda _=False, idx=i: self.save_full_size_preview(idx))
+
+            tile_layout.addWidget(lbl, 1)
+            tile_layout.addWidget(save_btn)
+
+            self.preview_labels.append(lbl)
+            self.preview_save_buttons.append(save_btn)
+            self.preview_grid.addWidget(tile, i // 2, i % 2)
+        right_layout.addLayout(self.preview_grid)
+
+        tools_row = QWidget()
+        tools_layout = QHBoxLayout(tools_row)
+        tools_layout.setContentsMargins(0, 0, 0, 0)
+        self.shuffle_preview_btn = QPushButton("Shuffle Preview Seeds")
+        tools_layout.addWidget(self.shuffle_preview_btn)
+        tools_layout.addStretch(1)
+        right_layout.addWidget(tools_row)
+
+        self.randomize_per_preview_chk = QCheckBox("Randomize unlocked for each preview")
+        right_layout.addWidget(self.randomize_per_preview_chk)
+
+        splitter.addWidget(right)
+        splitter.setSizes([520, 880])
+
+        self._build_controls()
+        self._load_ui_state()
+
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setSingleShot(True)
+        self.preview_timer.setInterval(150)
+        self.preview_timer.timeout.connect(self._render_previews)
+
+        self._generation_thread: GenerationThread | None = None
+        self._progress = None
+
+        self.schedule_preview()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.preview_timer.start()
 
     def closeEvent(self, event):
         self.save_lock_state()

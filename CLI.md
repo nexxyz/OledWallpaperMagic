@@ -1,27 +1,27 @@
 # CLI Reference
 
-The CLI is available via the `oledwall` command after installation.
+The CLI is available via the `owm` command after installation.
 
 ## Commands
 
-### `oledwall gui` — Desktop GUI
+### `owm gui` — Desktop GUI
 
 Launches the PySide6 desktop application.
 
 ```bash
-oledwall gui
+owm gui
 ```
 
 See the [README](README.md) for the full GUI workflow.
 
 ---
 
-### `oledwall gen` — Generate a session
+### `owm gen` — Generate a session
 
 Generates a batch of wallpapers into a session folder for later review.
 
 ```bash
-oledwall gen [OPTIONS]
+owm gen [OPTIONS]
 ```
 
 **Generation options:**
@@ -53,44 +53,44 @@ oledwall gen [OPTIONS]
 
 ```bash
 # Default settings, 80 wallpapers at 1440p
-oledwall gen --count 80
+owm gen --count 80
 
 # Reproducible batch
-oledwall gen --count 100 --seed 42
+owm gen --count 100 --seed 42
 
 # Dense, sharp circles
-oledwall gen --count 50 --min-circles 15 --max-circles 30 --curve ease --curve-param 3.0
+owm gen --count 50 --min-circles 15 --max-circles 30 --curve ease --curve-param 3.0
 
 # Large, soft, sparse circles on black
-oledwall gen --count 30 --min-circles 3 --max-circles 6 --min-radius 150 --max-radius 600 --curve gaussian --curve-param 1.5
+owm gen --count 30 --min-circles 3 --max-circles 6 --min-radius 150 --max-radius 600 --curve gaussian --curve-param 1.5
 
 # Using a preset
-oledwall gen --preset ultrawide --count 120 --resolution 3440x1440
+owm gen --preset ultrawide --count 120 --resolution 3440x1440
 
 # Custom colors
-oledwall gen --count 30 --primary "#FF3366" --secondary "#33CCFF" --glow-color "#FFFFFF"
+owm gen --count 30 --primary "#FF3366" --secondary "#33CCFF" --glow-color "#FFFFFF"
 ```
 
 ---
 
-### `oledwall run` — Generate + review immediately
+### `owm run` — Generate + review immediately
 
 Combines `gen` and `review` in one command. After generation finishes, immediately opens the review UI.
 
 ```bash
-oledwall run [OPTIONS]
+owm run [OPTIONS]
 ```
 
-Accepts the same options as `oledwall gen`.
+Accepts the same options as `owm gen`.
 
 ---
 
-### `oledwall review` — Review a session
+### `owm review` — Review a session
 
 Opens the review UI for a previously generated session.
 
 ```bash
-oledwall review SESSION_PATH [OPTIONS]
+owm review SESSION_PATH [OPTIONS]
 ```
 
 | Flag | Description |
@@ -109,7 +109,6 @@ oledwall review SESSION_PATH [OPTIONS]
 | `U` | Unmark (reset to undecided) |
 | `G` | Jump to first undecided image |
 | `Home` / `End` | First / last image |
-| `R` | Random jump |
 | `Enter` | **Finalize** — export kept images |
 | `Esc` or `Q` | Quit |
 
@@ -117,17 +116,17 @@ Click on a thumbnail at the bottom to jump directly to that image.
 
 ---
 
-### `oledwall presets` — Manage presets
+### `owm presets` — Manage presets
 
 ```bash
 # List all available presets
-oledwall presets list
+owm presets list
 
 # Show a preset's full configuration
-oledwall presets show ultrawide
+owm presets show ultrawide
 
 # Delete a user preset (built-in presets cannot be deleted)
-oledwall presets delete my-preset
+owm presets delete my-preset
 ```
 
 ---
@@ -151,9 +150,9 @@ The `--curve` flag controls how the circle fades from center to edge:
 Pass `--seed` to get the same batch on repeated runs:
 
 ```bash
-oledwall gen --count 50 --seed 12345
+owm gen --count 50 --seed 12345
 # ... generate again with same seed ...
-oledwall gen --count 50 --seed 12345  # identical output
+owm gen --count 50 --seed 12345  # identical output
 ```
 
 The seed is stored in the session metadata alongside per-image seeds.

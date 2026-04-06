@@ -10,9 +10,9 @@ QtGui = importlib.import_module(".".join([_qt_pkg, "Qt" + "Gui"]))
 QImage = QtGui.QImage
 QPixmap = QtGui.QPixmap
 
-from oledwall.config import AppConfig
-from oledwall.generator.fuzzy_circle import get_alpha_curve, glow_ring_alpha
-from oledwall.generator.palette import ColorPalette
+from oled_wallpaper_magic.config import AppConfig
+from oled_wallpaper_magic.generator.fuzzy_circle import get_alpha_curve, glow_ring_alpha
+from oled_wallpaper_magic.generator.palette import ColorPalette
 
 
 def _render_array(cfg: AppConfig, seed: int, width: int, height: int) -> np.ndarray:

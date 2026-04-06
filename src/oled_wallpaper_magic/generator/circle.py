@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import numpy as np
 from dataclasses import dataclass
-from typing import Callable
 
-from oledwall.generator.palette import RGB
-from oledwall.generator.fuzzy_circle import get_alpha_curve, glow_ring_alpha
+import numpy as np
+
+from oled_wallpaper_magic.generator.fuzzy_circle import get_alpha_curve, glow_ring_alpha
+from oled_wallpaper_magic.generator.palette import RGB
 
 
 @dataclass

@@ -4,7 +4,12 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from oledwall.config import AppConfig, ColorConfig, GenerationConfig, Resolution, SessionConfig
+from oled_wallpaper_magic.config import (
+    AppConfig,
+    ColorConfig,
+    GenerationConfig,
+    SessionConfig,
+)
 
 BUILTIN_PRESETS_DIR = Path(__file__).parent.parent.parent / "presets"
 
@@ -162,14 +167,19 @@ class PresetData:
         )
         session = SessionConfig(**session_data)
         seed = self.data.get("seed")
-        return AppConfig(generation=gen, colors=colors, session=session, seed=seed if isinstance(seed, int) else None)
+        final_seed = seed if isinstance(seed, int) else None
+        return AppConfig(
+            generation=gen, colors=colors, session=session, seed=final_seed
+        )
 
     def to_toml(self) -> str:
         import io
-        import toml
-        buf = io.StringIO()
-        toml.dump(self.data, buf)
-        return buf.getvalue()
+
+        import tomli_w
+
+        buf = io.BytesIO()
+        tomli_w.dump(self.data, buf)
+        return buf.getvalue().decode("utf-8")
 
 
 class PresetStore:

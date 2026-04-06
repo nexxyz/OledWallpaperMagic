@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-import math
 from typing import Literal
 
 RGB = tuple[int, int, int]

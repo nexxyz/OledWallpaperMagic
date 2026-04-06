@@ -8,9 +8,9 @@ scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 pythonwPath = scriptDir & "\.venv\Scripts\pythonw.exe"
 
 If fso.FileExists(pythonwPath) Then
-    cmd = "\"" & pythonwPath & "\" -m oledwall.cli gui"
+    cmd = "\"" & pythonwPath & "\" -m oled_wallpaper_magic.cli gui"
 Else
-    cmd = "pythonw -m oledwall.cli gui"
+    cmd = "pythonw -m oled_wallpaper_magic.cli gui"
 End If
 
 shell.CurrentDirectory = scriptDir

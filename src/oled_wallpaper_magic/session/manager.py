@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import shutil
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from oledwall.config import AppConfig
-from oledwall.session.metadata import Session, ImageRecord, new_session_id
+from oled_wallpaper_magic.config import AppConfig
+from oled_wallpaper_magic.session.metadata import ImageRecord, Session, new_session_id
 
 
 class SessionManager:
@@ -73,26 +75,36 @@ class SessionManager:
         root = self.base_dir / session_id
         meta_path = root / "metadata.json"
 
-        with open(meta_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                manifest = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Session metadata not found: {meta_path}") from None
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Corrupted session metadata: {meta_path}: {e}") from None
+
+        required_fields = ["session_id", "images"]
+        for field in required_fields:
+            if field not in manifest:
+                raise ValueError(f"Missing required field '{field}' in session metadata")
 
         images = [
             ImageRecord(
-                filename=img["filename"],
-                index=img["index"],
-                seed=img["seed"],
+                filename=img.get("filename", ""),
+                index=img.get("index", 0),
+                seed=img.get("seed", 0),
                 palette=img.get("palette", {}),
                 circle_count=img.get("circle_count", 0),
                 generation_time_ms=img.get("generation_time_ms", 0.0),
             )
-            for img in manifest["images"]
+            for img in manifest.get("images", [])
         ]
 
         config_data = manifest.get("config")
         config = AppConfig.model_validate(config_data) if config_data else None
 
         return Session(
-            id=session_id,
+            id=manifest["session_id"],
             root=root,
             config=config,
             images=images,
@@ -108,19 +120,20 @@ class SessionManager:
             if d.is_dir() and d.name.startswith("session_"):
                 meta_path = d / "metadata.json"
                 if meta_path.exists():
-                    with open(meta_path) as f:
-                        m = json.load(f)
-                    sessions.append({
-                        "id": m["session_id"],
-                        "created_at": m["created_at"],
-                        "count": len(m.get("images", [])),
-                        "path": str(d),
-                    })
+                    try:
+                        with open(meta_path) as f:
+                            m = json.load(f)
+                        sessions.append({
+                            "id": m.get("session_id", d.name),
+                            "created_at": m.get("created_at", ""),
+                            "count": len(m.get("images", [])),
+                            "path": str(d),
+                        })
+                    except (json.JSONDecodeError, OSError):
+                        continue
         return sessions
 
     def finalize(self, session: Session, save_dir: Path, purge: bool = False) -> int:
-        import shutil
-
         save_dir.mkdir(parents=True, exist_ok=True)
         kept = 0
 
@@ -128,18 +141,19 @@ class SessionManager:
             if status == "keep":
                 src = session.root / "generated" / filename
                 if src.exists():
-                    dest_name = f"oled_{session.id.split('_')[1]}_{filename.replace('img_', '').replace('.png', '')}.png"
+                    session_date = session.id.split("_")[1]
+                    base_name = filename.replace("img_", "").replace(".png", "")
+                    dest_name = f"oled_{session_date}_{base_name}.png"
                     dest = save_dir / dest_name
                     shutil.copy2(src, dest)
                     kept += 1
 
         if purge:
-            import shutil
             shutil.rmtree(session.root)
 
         return kept
 
     @staticmethod
     def _now_iso() -> str:
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+        return datetime.now(UTC).isoformat()
