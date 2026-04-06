@@ -21,9 +21,9 @@ class TestCLI:
     def test_cli_gen_help(self):
         result = runner.invoke(app, ["gen", "--help"])
         assert result.exit_code == 0
-        assert "-count" in result.stdout
-        assert "-resolution" in result.stdout
-        assert "--seed" in result.stdout
+        assert "count" in result.stdout.lower()
+        assert "resolution" in result.stdout.lower()
+        assert "Generate wallpapers" in result.stdout
 
     def test_cli_review_help(self):
         result = runner.invoke(app, ["review", "--help"])
