@@ -1,10 +1,8 @@
-# oledwall
+# Oled Wallpaper Magic
 
-> **⚠️ Under Construction — v0.1.0 pre-release**
->
-> This tool is functional but still maturing. API, CLI, and config formats may change.
+> **Beautiful abstract wallpapers featuring soft, glowing circles against pure black.**
 
-Generate beautiful abstract wallpapers featuring soft, glowing circles against pure black. Bulk-generate hundreds of variations, review them in a desktop window, and keep only the best.
+Generate hundreds of variations, review them in a desktop window, and keep only the best.
 
 Pair it with **Windows Slideshow** (`Settings → Personalize → Background → Slideshow`) to cycle through your kept wallpapers automatically — great for keeping your OLED screen fresh and healthy.
 
@@ -40,7 +38,7 @@ Requires Python 3.11+.
 The GUI is the fastest way to explore styles and generate batches:
 
 ```bash
-oledwall gui
+owm gui
 ```
 
 On Windows, you can also double-click `run_gui.bat` (console-free launch) or `run_gui.vbs`.
@@ -59,7 +57,7 @@ The GUI opens with `awesome_bubbles` as the default style. Use the **Randomize**
 
 ## Presets
 
-Built-in presets ship with oledwall:
+Built-in presets ship with OledWallpaperMagic:
 
 | Preset | Description |
 |--------|-------------|

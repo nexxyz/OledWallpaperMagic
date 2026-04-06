@@ -1,3 +1,3 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-python -m oledwall.cli gui
+python -m oled_wallpaper_magic.cli gui

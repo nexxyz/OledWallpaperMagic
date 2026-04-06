@@ -3,17 +3,17 @@ from __future__ import annotations
 import os
 import random
 import time
+from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 from PIL import Image
 
-from oledwall.config import AppConfig
-from oledwall.generator.palette import ColorPalette, RGB
-from oledwall.generator.circle import FuzzyCircle
+from oled_wallpaper_magic.config import AppConfig
+from oled_wallpaper_magic.generator.circle import FuzzyCircle
+from oled_wallpaper_magic.generator.palette import RGB, ColorPalette
 
 
 @dataclass
@@ -138,9 +138,13 @@ class GenerationEngine:
         self.res = config.resolution
 
     def _build_args(self, count: int, session_seed: int) -> list:
+        from oled_wallpaper_magic.config import DEFAULT_SEED_RANGE
         args_list = []
         for i in range(count):
-            per_image_seed = session_seed + i if session_seed else random.randint(0, 2**31 - 1)
+            if session_seed is not None:
+                per_image_seed = session_seed + i
+            else:
+                per_image_seed = random.randint(0, DEFAULT_SEED_RANGE)
             args_list.append((
                 i,
                 per_image_seed,
@@ -203,7 +207,10 @@ class GenerationEngine:
                 results: dict[int, tuple] = {}
                 next_index = 0
                 for future in as_completed(futures):
-                    result = future.result()
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        raise RuntimeError(f"Generation failed: {e}") from e
                     results[result[0]] = result
                     while next_index in results:
                         index, img_seed, pixels, palette, circle_count, gen_ms = results.pop(next_index)

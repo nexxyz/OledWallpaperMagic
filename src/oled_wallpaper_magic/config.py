@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Literal, Any
+from typing import Any, Literal
 
-import pydantic
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 RGB = tuple[int, int, int]
 COLOR_VALUE = RGB | Literal["random"]
+
+DEFAULT_SAVE_DIR = Path("./wallpapers/kept")
+DEFAULT_TEMP_DIR = Path("./wallpapers/_batch")
+DEFAULT_SEED_RANGE = 2**31 - 1
 
 
 def parse_color(value: str) -> RGB | Literal["random"]:
@@ -24,7 +27,10 @@ def parse_color(value: str) -> RGB | Literal["random"]:
     m = re.match(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", value, re.IGNORECASE)
     if m:
         return (int(m.group(1)), int(m.group(2)), int(m.group(3)))
-    raise ValueError(f"Cannot parse color: '{value}'. Expected hex (#RRGGBB or #RGB), rgb(r,g,b), or 'random'.")
+    raise ValueError(
+        f"Cannot parse color: '{value}'. "
+        "Expected hex (#RRGGBB or #RGB), rgb(r,g,b), or 'random'."
+    )
 
 
 class Resolution(BaseModel):
@@ -51,13 +57,13 @@ class GenerationConfig(BaseModel):
     @model_validator(mode="after")
     def check_ranges(self):
         if not self.min_circles <= self.max_circles:
-            raise ValueError(f"min_circles ({self.min_circles}) must be <= max_circles ({self.max_circles})")
+            raise ValueError(f"min_circles ({self.min_circles}) must be <= max_circles")
         if not self.min_radius <= self.max_radius:
-            raise ValueError(f"min_radius ({self.min_radius}) must be <= max_radius ({self.max_radius})")
+            raise ValueError(f"min_radius ({self.min_radius}) must be <= max_radius")
         if not self.primary_opacity_min <= self.primary_opacity_max:
-            raise ValueError(
-                f"primary_opacity_min ({self.primary_opacity_min}) must be <= primary_opacity_max ({self.primary_opacity_max})"
-            )
+            min_op = self.primary_opacity_min
+            max_op = self.primary_opacity_max
+            raise ValueError(f"primary_opacity_min ({min_op}) must be <= primary_opacity_max ({max_op})")
         return self
 
 
@@ -105,8 +111,8 @@ class ColorConfig(BaseModel):
 
 class SessionConfig(BaseModel):
     count: int = Field(default=50, ge=1)
-    save_dir: Path = Path("./wallpapers/kept")
-    temp_dir: Path = Path("./wallpapers/_batch")
+    save_dir: Path = Field(default_factory=lambda: DEFAULT_SAVE_DIR)
+    temp_dir: Path = Field(default_factory=lambda: DEFAULT_TEMP_DIR)
     format: Literal["png"] = "png"
     purge_discarded: bool = False
 
@@ -120,7 +126,7 @@ class AppConfig(BaseModel):
 
     @classmethod
     def from_preset(cls, name: str) -> AppConfig:
-        from oledwall.presets import preset_store
+        from oled_wallpaper_magic.presets import preset_store
 
         preset = preset_store.get(name)
         if preset is None:
@@ -132,8 +138,9 @@ class AppConfig(BaseModel):
 
     def to_toml(self) -> str:
         import io
-        import toml
 
-        buf = io.StringIO()
-        toml.dump(self.model_dump(), buf)
-        return buf.getvalue()
+        import tomli_w
+
+        buf = io.BytesIO()
+        tomli_w.dump(self.model_dump(), buf)
+        return buf.getvalue().decode("utf-8")

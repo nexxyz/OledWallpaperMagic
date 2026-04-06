@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 if exist ".venv\Scripts\pythonw.exe" (
-  start "" ".venv\Scripts\pythonw.exe" -m oledwall.cli gui
+  start "" ".venv\Scripts\pythonw.exe" -m oled_wallpaper_magic.cli gui
 ) else (
-  start "" pythonw -m oledwall.cli gui
+  start "" pythonw -m oled_wallpaper_magic.cli gui
 )

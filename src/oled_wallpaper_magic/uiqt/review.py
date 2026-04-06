@@ -28,9 +28,8 @@ QSplitter = QtWidgets.QSplitter
 QVBoxLayout = QtWidgets.QVBoxLayout
 QWidget = QtWidgets.QWidget
 
-from oledwall.session.metadata import Session
-from oledwall.session.manager import SessionManager
-
+from oled_wallpaper_magic.session.manager import SessionManager
+from oled_wallpaper_magic.session.metadata import Session
 
 STATUS_COLORS = {
     "keep": "#3cd664",
@@ -50,7 +49,7 @@ class ReviewWindow(QMainWindow):
         self.generated_dir = self.session.root / "generated"
         self.manager = SessionManager(self.session.root.parent)
 
-        self.setWindowTitle(f"oledwall review - {session.id}")
+        self.setWindowTitle(f"OledWallpaperMagic - Review - {session.id}")
         self.resize(1400, 900)
 
         root = QWidget(self)
@@ -105,7 +104,8 @@ class ReviewWindow(QMainWindow):
         splitter.setSizes([760, 120])
 
         self.hints_label = QLabel(
-            "<- / -> navigate   K keep   D discard   U undecided   G first undecided   Home/End   Enter finalize   Esc close"
+            "<- / -> navigate   K keep   D discard   U undecided   "
+            "G first undecided   Home/End   Enter finalize   Esc close"
         )
         self.hints_label.setStyleSheet("color:#b0b0b0; padding:4px 6px;")
         self.hints_label.setToolTip("Keyboard shortcuts for fast review.")
@@ -149,7 +149,11 @@ class ReviewWindow(QMainWindow):
             path = self.generated_dir / img.filename
             pix = QPixmap(str(path))
             if not pix.isNull():
-                icon_pix = pix.scaled(120, 68, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                icon_pix = pix.scaled(
+                    120, 68,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
                 item.setIcon(QIcon(icon_pix))
             self.thumb_list.addItem(item)
         self.thumb_list.setCurrentRow(self.current_index)
@@ -178,8 +182,13 @@ class ReviewWindow(QMainWindow):
         else:
             self._set_image_pixmap(pix)
         status = self._status()
-        self.status_label.setText(f"{self.current_index + 1}/{len(self.session.images)} - {status.upper()}")
-        self.status_label.setStyleSheet(f"padding:6px; font-weight:600; color:{STATUS_COLORS.get(status, '#8f8f8f')};")
+        img_count = len(self.session.images)
+        self.status_label.setText(
+            f"{self.current_index + 1}/{img_count} - {status.upper()}"
+        )
+        self.status_label.setStyleSheet(
+            f"padding:6px; font-weight:600; color:{STATUS_COLORS.get(status, '#8f8f8f')};"
+        )
         self._updating_ui = True
         try:
             self.thumb_list.setCurrentRow(self.current_index)
@@ -191,7 +200,11 @@ class ReviewWindow(QMainWindow):
         if size.width() <= 1 or size.height() <= 1:
             self.image_label.setPixmap(pix)
             return
-        scaled = pix.scaled(size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        scaled = pix.scaled(
+            size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
         self.image_label.setPixmap(scaled)
 
     def resizeEvent(self, event):

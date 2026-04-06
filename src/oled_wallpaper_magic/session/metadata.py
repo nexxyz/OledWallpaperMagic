@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from oledwall.config import AppConfig, RGB
+from oled_wallpaper_magic.config import RGB, AppConfig
 
 ReviewStatus = str
 
@@ -22,8 +22,8 @@ class ImageRecord:
 @dataclass
 class Session:
     id: str
-    root: "Path"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    root: Path
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     config: AppConfig | None = None
     images: list[ImageRecord] = field(default_factory=list)
     review_state: dict[str, ReviewStatus] = field(default_factory=dict)
@@ -31,4 +31,4 @@ class Session:
 
 
 def new_session_id() -> str:
-    return datetime.now(timezone.utc).strftime("session_%Y%m%d_%H%M%S")
+    return datetime.now(UTC).strftime("session_%Y%m%d_%H%M%S")

@@ -5,11 +5,11 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from oledwall.version import __version__
+from oled_wallpaper_magic.config import DEFAULT_SAVE_DIR, DEFAULT_TEMP_DIR
 
 app = typer.Typer(
     rich_markup_mode="rich",
-    help="[bold]oledwall[/bold] — OLED fuzzy circle wallpaper generator",
+    help="[bold]oled_wallpaper_magic[/bold] — OLED fuzzy circle wallpaper generator",
 )
 presets_app = typer.Typer(help="Manage presets")
 
@@ -36,8 +36,8 @@ _GEN_OPTIONS = [
     typer.Option(None, "--seed", help="Random seed for reproducibility"),
     typer.Option(1, "--workers", "-w", help="Parallel workers (0=auto)"),
     typer.Option(None, "--preset", help="Load preset as base config"),
-    typer.Option(Path("./wallpapers/kept"), "--save-dir", help="Final output folder"),
-    typer.Option(Path("./wallpapers/_batch"), "--temp-dir", help="Session staging folder"),
+    typer.Option(DEFAULT_SAVE_DIR, "--save-dir", help="Final output folder"),
+    typer.Option(DEFAULT_TEMP_DIR, "--temp-dir", help="Session staging folder"),
 ]
 
 
@@ -63,12 +63,13 @@ def _build_config(
     save_dir: Path,
     temp_dir: Path,
 ):
-    from oledwall.config import AppConfig, ColorConfig, GenerationConfig, SessionConfig, Resolution, parse_color
+    from oled_wallpaper_magic.config import (
+        AppConfig,
+        Resolution,
+        parse_color,
+    )
 
-    if preset:
-        app_config = AppConfig.from_preset(preset)
-    else:
-        app_config = AppConfig()
+    app_config = AppConfig.from_preset(preset) if preset else AppConfig()
 
     width, height = map(int, resolution.split("x"))
     app_config.resolution = Resolution(width=width, height=height)
@@ -117,8 +118,8 @@ def run(
     temp_dir: Path = _GEN_OPTIONS[19],
 ) -> None:
     """Generate wallpapers then launch review immediately."""
-    from oledwall.session.manager import SessionManager
-    from oledwall.uiqt.review import launch_review_window
+    from oled_wallpaper_magic.session.manager import SessionManager
+    from oled_wallpaper_magic.uiqt.review import launch_review_window
 
     app_config = _build_config(
         count, resolution, min_circles, max_circles, min_radius, max_radius,
@@ -160,7 +161,7 @@ def gen(
     temp_dir: Path = _GEN_OPTIONS[19],
 ) -> None:
     """Generate wallpapers and save them as a session."""
-    from oledwall.session.manager import SessionManager
+    from oled_wallpaper_magic.session.manager import SessionManager
 
     app_config = _build_config(
         count, resolution, min_circles, max_circles, min_radius, max_radius,
@@ -174,7 +175,7 @@ def gen(
     _generate_session(session, app_config, console)
 
     console.print(f"\n[green]Generated {count} wallpapers in {session.root}[/green]")
-    console.print(f"[dim]Review with: [bold]oledwall review {session.root}[/bold][/dim]")
+    console.print(f"[dim]Review with: [bold]oled_wallpaper_magic review {session.root}[/bold][/dim]")
 
 
 @app.command("review")
@@ -183,8 +184,8 @@ def review_cmd(
     start_index: int = typer.Option(0, "--start", "-s", help="Start index"),
 ) -> None:
     """Review a session's wallpapers in a windowed desktop UI."""
-    from oledwall.session.manager import SessionManager
-    from oledwall.uiqt.review import launch_review_window
+    from oled_wallpaper_magic.session.manager import SessionManager
+    from oled_wallpaper_magic.uiqt.review import launch_review_window
 
     manager = SessionManager(session_path.parent)
     session = manager.load_session(session_path.name)
@@ -194,8 +195,9 @@ def review_cmd(
 @presets_app.command("list")
 def presets_list() -> None:
     """List all available presets."""
-    from oledwall.presets import preset_store
     from rich.table import Table
+
+    from oled_wallpaper_magic.presets import preset_store
 
     presets = preset_store.list_presets()
     table = Table(title="Available Presets")
@@ -212,7 +214,7 @@ def presets_list() -> None:
 @presets_app.command("show")
 def presets_show(name: str = typer.Argument(..., help="Preset name")) -> None:
     """Show a preset's full configuration."""
-    from oledwall.presets import preset_store
+    from oled_wallpaper_magic.presets import preset_store
 
     preset = preset_store.get(name)
     if preset is None:
@@ -226,7 +228,7 @@ def presets_show(name: str = typer.Argument(..., help="Preset name")) -> None:
 @presets_app.command("delete")
 def presets_delete(name: str = typer.Argument(..., help="Preset name")) -> None:
     """Delete a user preset."""
-    from oledwall.presets import preset_store
+    from oled_wallpaper_magic.presets import preset_store
 
     ok = preset_store.delete(name)
     if ok:
@@ -237,9 +239,16 @@ def presets_delete(name: str = typer.Argument(..., help="Preset name")) -> None:
 
 
 def _generate_session(session, app_config, console: Console) -> None:
-    from oledwall.generator.engine import GenerationEngine
-    from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
-    from oledwall.session.manager import SessionManager
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        TaskProgressColumn,
+        TextColumn,
+        TimeRemainingColumn,
+    )
+
+    from oled_wallpaper_magic.generator.engine import GenerationEngine
+    from oled_wallpaper_magic.session.manager import SessionManager
 
     engine = GenerationEngine(app_config)
     generated = session.root / "generated"
@@ -257,7 +266,10 @@ def _generate_session(session, app_config, console: Console) -> None:
         task = progress.add_task("[cyan]Generating wallpapers...", total=len(session.images))
 
         try:
-            for i, image_data in enumerate(engine.generate_batch(len(session.images), app_config.seed or 0)):
+            batch_seed = app_config.seed if app_config.seed is not None else 0
+            for i, image_data in enumerate(
+                engine.generate_batch(len(session.images), batch_seed)
+            ):
                 img_path = generated / f"img_{i+1:04d}.png"
                 image_data.save(img_path)
                 session.images[i].filename = img_path.name
@@ -271,8 +283,11 @@ def _generate_session(session, app_config, console: Console) -> None:
             session.current_index = 0
             manager.save_session(session)
             generated_count = sum(1 for img in session.images if img.filename)
-            console.print(f"\n[yellow]Interrupted. {generated_count}/{len(session.images)} images saved.[/yellow]")
-            console.print(f"[dim]Resume with: [bold]oledwall review {session.root}[/bold][/dim]")
+            total = len(session.images)
+            console.print(
+                f"\n[yellow]Interrupted. {generated_count}/{total} images saved.[/yellow]"
+            )
+            console.print(f"[dim]Resume with: [bold]oled_wallpaper_magic review {session.root}[/bold][/dim]")
             raise
 
     session.review_state = {img.filename: "unddecided" for img in session.images if img.filename}
@@ -283,7 +298,7 @@ def _generate_session(session, app_config, console: Console) -> None:
 @app.command("gui")
 def gui() -> None:
     """Launch the interactive GUI (config panel + preview + review)."""
-    from oledwall.uiqt.app import launch_qt_gui
+    from oled_wallpaper_magic.uiqt.app import launch_qt_gui
 
     launch_qt_gui()
 
