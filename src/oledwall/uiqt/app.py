@@ -415,8 +415,10 @@ class MainWindow(QMainWindow):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         self.generate_btn = QPushButton("Generate Batch")
         self.open_btn = QPushButton("Open Session")
+        self.cleanup_btn = QPushButton("Clean Up Sessions")
         btn_layout.addWidget(self.generate_btn)
         btn_layout.addWidget(self.open_btn)
+        btn_layout.addWidget(self.cleanup_btn)
         batch_layout.addWidget(btn_row)
         self.form.addRow(batch_section)
 
@@ -445,6 +447,7 @@ class MainWindow(QMainWindow):
 
         self.generate_btn.clicked.connect(self.start_generation)
         self.open_btn.clicked.connect(self.open_session)
+        self.cleanup_btn.clicked.connect(self.cleanup_sessions)
         self.save_dir_browse_btn.clicked.connect(self.browse_save_dir)
         self.load_preset_btn.clicked.connect(self.apply_selected_preset)
         self.save_preset_btn.clicked.connect(self.save_current_preset)
@@ -497,6 +500,7 @@ class MainWindow(QMainWindow):
         self.workers_spin.setToolTip("Parallel worker count for generation (0 = auto / all cores).")
         self.generate_btn.setToolTip("Generate a batch and open review for the session.")
         self.open_btn.setToolTip("Open an existing saved session for review.")
+        self.cleanup_btn.setToolTip("Delete all session folders in the temp directory (keeps your saved wallpapers).")
 
         self.shuffle_preview_btn.setToolTip("Change preview seeds without changing any settings.")
         self.randomize_per_preview_chk.setToolTip(
@@ -1033,6 +1037,41 @@ class MainWindow(QMainWindow):
             return
         review = ReviewWindow(session, session.current_index, self)
         review.show()
+
+    def cleanup_sessions(self) -> None:
+        self._apply_form_to_config()
+        base_dir = self.config.session.temp_dir
+        manager = SessionManager(base_dir)
+        sessions = manager.list_sessions()
+        if not sessions:
+            QMessageBox.information(self, "No Sessions", "No session folders found to clean up.")
+            return
+
+        names = [s["id"] for s in sessions]
+        msg = (
+            f"Found {len(sessions)} session folder(s):\n\n"
+            + "\n".join(f"  • {n}" for n in names)
+            + "\n\nThis will delete all session folders (but not your kept wallpapers). Continue?"
+        )
+        answer = QMessageBox.question(
+            self,
+            "Clean Up Sessions",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        deleted = 0
+        for s in sessions:
+            try:
+                import shutil
+                shutil.rmtree(Path(s["path"]))
+                deleted += 1
+            except Exception:
+                pass
+        QMessageBox.information(self, "Cleanup Complete", f"Deleted {deleted} session folder(s).")
 
     def closeEvent(self, event):
         self.save_lock_state()
