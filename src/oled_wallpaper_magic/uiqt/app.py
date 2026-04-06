@@ -66,10 +66,6 @@ def _randomize_config_unlocked(base: AppConfig, locks: dict[str, bool], rng: ran
     def unlocked(key: str) -> bool:
         return not locks.get(key, False)
 
-    if unlocked("width"):
-        cfg.resolution.width = rng.randint(640, 7680)
-    if unlocked("height"):
-        cfg.resolution.height = rng.randint(360, 4320)
     if unlocked("min_circles"):
         cfg.generation.min_circles = rng.randint(1, 30)
     if unlocked("max_circles"):
@@ -197,8 +193,10 @@ class ConfigPanelMixin:
         self.curve_combo = QComboBox()
         self.curve_combo.addItems(["linear", "ease", "exp", "gaussian", "flat"])
         self.curve_combo.setCurrentText(self.config.generation.curve)
+        self.curve_combo.wheelEvent = self._disable_wheel
 
         self.preset_combo = QComboBox()
+        self.preset_combo.wheelEvent = self._disable_wheel
         self.preset_name_edit = QLineEdit("")
         self.preset_name_edit.setPlaceholderText("preset name")
 
@@ -229,8 +227,8 @@ class ConfigPanelMixin:
         self.screen_res_btn = QPushButton("Use Current Screen Resolution")
         self.screen_res_btn.clicked.connect(self.use_current_screen_resolution)
 
-        self._add_locked_row("Width", self.width_spin, "width")
-        self._add_locked_row("Height", self.height_spin, "height")
+        self.form.addRow("Width", self.width_spin)
+        self.form.addRow("Height", self.height_spin)
         self.form.addRow("", self.screen_res_btn)
 
         top_section = QGroupBox("Presets & Randomization")
@@ -1101,13 +1099,13 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
             btn_layout.setContentsMargins(0, 0, 0, 0)
             btn_layout.setSpacing(4)
 
-            save_btn = QPushButton("Save")
-            save_btn.setFixedWidth(60)
+            save_btn = QPushButton("Save full resolution")
+            save_btn.setFixedWidth(120)
             save_btn.clicked.connect(lambda _=False, idx=i: self.save_full_size_preview(idx))
             save_btn.setToolTip(f"Save Preview {i + 1} at full configured resolution.")
 
-            freeze_btn = QPushButton("Freeze")
-            freeze_btn.setFixedWidth(60)
+            freeze_btn = QPushButton("Freeze these parameters")
+            freeze_btn.setFixedWidth(140)
             freeze_btn.clicked.connect(lambda _=False, idx=i: self.freeze_preview_params(idx))
             freeze_btn.setToolTip(f"Apply Preview {i + 1} parameters to config and lock all.")
 
