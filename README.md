@@ -14,8 +14,8 @@ The GUI starts with the `awesome_bubbles` style as its default look.
 
 | | | |
 |:---:|:---:|:---:|
-| ![Sample 1](sample/oled_20260406_0005_thumb.png) | ![Sample 2](sample/oled_20260406_0011_thumb.png) | ![Sample 3](sample/oled_20260406_0017_thumb.png) |
-| ![Sample 4](sample/oled_20260406_0020-1701_%285%29_thumb.png) | ![Sample 5](sample/oled_20260406_0020-1701_%289%29_thumb.png) | ![Sample 6](sample/oled_20260406_0020-1701_%2816%29_thumb.png) |
+| ![Sample 1](sample/sample_01.png) | ![Sample 2](sample/sample_02.png) | ![Sample 3](sample/sample_03.png) |
+| ![Sample 4](sample/sample_04.png) | ![Sample 5](sample/sample_05.png) | ![Sample 6](sample/sample_06.png) |
 
 ---
 
