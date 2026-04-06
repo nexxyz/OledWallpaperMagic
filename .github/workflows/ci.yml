@@ -54,8 +54,8 @@ jobs:
       - name: Install dependencies
         run: pip install .[dev]
 
-      - name: Run mypy
-        run: mypy src/ || true
+      - name: Run ruff
+        run: ruff check src/
 
   build:
     name: Build wheel
