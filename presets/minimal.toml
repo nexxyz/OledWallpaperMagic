@@ -1,0 +1,13 @@
+[generation]
+min_circles = 3
+max_circles = 6
+min_radius = 150
+max_radius = 600
+curve = "gaussian"
+curve_param = 1.5
+glow_strength = 0.2
+glow_mu = 0.88
+glow_sigma = 0.07
+
+[description]
+text = "Sparse, calm — few large circles with soft falloff"
