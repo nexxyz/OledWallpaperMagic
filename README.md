@@ -6,6 +6,8 @@
 
 Generate beautiful abstract wallpapers featuring soft, glowing circles against pure black. Bulk-generate hundreds of variations, review them in a desktop window, and keep only the best.
 
+Pair it with **Windows Slideshow** (`Settings → Personalize → Background → Slideshow`) to cycle through your kept wallpapers automatically — great for keeping your OLED screen fresh and healthy.
+
 ### Examples
 
 | | | |
