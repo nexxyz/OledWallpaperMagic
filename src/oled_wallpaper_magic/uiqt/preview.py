@@ -73,7 +73,7 @@ def _render_array(cfg: AppConfig, seed: int, width: int, height: int) -> np.ndar
     out = np.clip(canvas, 0, 255).astype(np.uint8)
 
     frame = np.zeros((height, width, 3), dtype=np.uint8)
-    frame[:] = np.array(palette.bg, dtype=np.uint8)
+    frame[:] = (0, 0, 0)  # Always use black for letterboxing
     ox = (width - draw_w) // 2
     oy = (height - draw_h) // 2
     frame[oy:oy + draw_h, ox:ox + draw_w, :] = out

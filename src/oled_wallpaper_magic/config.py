@@ -110,7 +110,7 @@ class ColorConfig(BaseModel):
 
 
 class SessionConfig(BaseModel):
-    count: int = Field(default=50, ge=1)
+    count: int = Field(default=10, ge=1)
     save_dir: Path = Field(default_factory=lambda: DEFAULT_SAVE_DIR)
     temp_dir: Path = Field(default_factory=lambda: DEFAULT_TEMP_DIR)
     format: Literal["png"] = "png"
