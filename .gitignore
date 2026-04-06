@@ -50,5 +50,7 @@ Thumbs.db
 .env.*
 *.local
 
-# Runtime output folders (generated wallpapers/sessions)
+# Runtime output / session files
 wallpapers/
+metadata.json
+review_state.json
