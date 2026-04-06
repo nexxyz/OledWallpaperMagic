@@ -10,6 +10,13 @@ Generate beautiful abstract wallpapers featuring soft, glowing circles against p
 
 The GUI starts with the `awesome_bubbles` style as its default look.
 
+### Examples
+
+| | | |
+|:---:|:---:|:---:|
+| ![Sample 1](sample/oled_20260406_0005_thumb.png) | ![Sample 2](sample/oled_20260406_0011_thumb.png) | ![Sample 3](sample/oled_20260406_0017_thumb.png) |
+| ![Sample 4](sample/oled_20260406_0020-1701_%285%29_thumb.png) | ![Sample 5](sample/oled_20260406_0020-1701_%289%29_thumb.png) | ![Sample 6](sample/oled_20260406_0020-1701_%2816%29_thumb.png) |
+
 ---
 
 ## Setup (Recommended)
