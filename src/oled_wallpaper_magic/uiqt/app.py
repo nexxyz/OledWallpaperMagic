@@ -768,6 +768,7 @@ class ConfigPanelMixin:
         w = QSpinBox()
         w.setRange(lo, hi)
         w.setValue(value)
+        w.wheelEvent = self._disable_wheel
         return w
 
     def _dspin(self, lo: float, hi: float, value: float, step: float) -> QDoubleSpinBox:
@@ -775,7 +776,11 @@ class ConfigPanelMixin:
         w.setRange(lo, hi)
         w.setSingleStep(step)
         w.setValue(value)
+        w.wheelEvent = self._disable_wheel
         return w
+
+    def _disable_wheel(self, event) -> None:
+        event.ignore()
 
     def _hex_edit(self, value: str) -> QLineEdit:
         w = QLineEdit(value)
