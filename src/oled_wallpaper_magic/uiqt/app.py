@@ -1101,7 +1101,7 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
             btn_layout.setContentsMargins(0, 0, 0, 0)
             btn_layout.setSpacing(4)
 
-            save_btn = QPushButton(f"Save")
+            save_btn = QPushButton("Save")
             save_btn.setFixedWidth(60)
             save_btn.clicked.connect(lambda _=False, idx=i: self.save_full_size_preview(idx))
             save_btn.setToolTip(f"Save Preview {i + 1} at full configured resolution.")
