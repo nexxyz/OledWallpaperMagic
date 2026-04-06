@@ -1,0 +1,13 @@
+[generation]
+min_circles = 15
+max_circles = 30
+min_radius = 40
+max_radius = 200
+curve = "ease"
+curve_param = 3.0
+glow_strength = 0.4
+glow_mu = 0.88
+glow_sigma = 0.07
+
+[description]
+text = "Many overlapping circles, sharper edges"

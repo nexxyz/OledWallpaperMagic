@@ -1,0 +1,21 @@
+[generation]
+min_circles = 8
+max_circles = 30
+min_radius = 47
+max_radius = 1012
+curve = "linear"
+curve_param = 1.14
+glow_strength = 0.64
+glow_mu = 0.83
+glow_sigma = 0.10
+primary_opacity_min = 0.48
+primary_opacity_max = 1.0
+
+[colors]
+background = [0, 0, 0]
+primary = [102, 74, 55]
+secondary = [70, 78, 155]
+glow = [84, 45, 233]
+
+[description]
+text = "Deep contrast bubbles with strong violet glow"
