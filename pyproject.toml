@@ -53,7 +53,9 @@ packages = ["src/oledwall"]
 include = [
     "/src",
     "/presets",
+    "/sample",
     "/README.md",
+    "/CLI.md",
     "/DESIGN.md",
 ]
 
