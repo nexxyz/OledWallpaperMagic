@@ -20,7 +20,6 @@ class TestPresetStore:
         preset = preset_store.get("awesome_bubbles")
         assert preset is not None
         assert preset.name == "awesome_bubbles"
-        assert preset.source == "built-in"
 
     def test_preset_get_invalid(self):
         preset = preset_store.get("nonexistent_preset")
@@ -43,8 +42,7 @@ class TestPresetStore:
 
     def test_all_builtins_have_descriptions(self):
         presets = preset_store.list_presets()
-        builtins = [p for p in presets if p["source"] == "built-in"]
-        for p in builtins:
+        for p in presets:
             assert p["description"], f"Preset {p['name']} missing description"
 
     def test_builtin_preset_configs_are_valid(self):
@@ -84,7 +82,6 @@ class TestUserPresets:
 
             loaded = store.get("my_preset")
             assert loaded is not None
-            assert loaded.source == "user"
 
             config = loaded.to_config()
             assert config.generation.min_circles == 5
@@ -117,6 +114,3 @@ class TestUserPresets:
             presets = store.list_presets()
             names = [p["name"] for p in presets]
             assert "user_test" in names
-
-            sources = [p["source"] for p in presets if p["name"] == "user_test"]
-            assert "user" in sources

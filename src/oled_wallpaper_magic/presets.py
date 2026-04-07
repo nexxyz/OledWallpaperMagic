@@ -12,10 +12,7 @@ from oled_wallpaper_magic.config import (
     SessionConfig,
 )
 
-if getattr(sys, "frozen", False):
-    _base = Path(sys._MEIPASS)
-else:
-    _base = Path(__file__).parent.parent.parent
+_base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent.parent.parent
 
 BUILTIN_PRESETS_DIR = _base / "presets"
 
@@ -87,9 +84,17 @@ class PresetStore:
         result = []
         for name in sorted(all_names):
             if name in self._user_presets():
-                desc = self._user_presets()[name].get("description", {}).get("text", "")
+                desc_data = self._user_presets()[name].get("description", "")
+                if isinstance(desc_data, dict):
+                    desc = desc_data.get("text", "")
+                else:
+                    desc = str(desc_data) if desc_data else ""
             else:
-                desc = self._builtin_presets()[name].get("description", {}).get("text", "")
+                desc_data = self._builtin_presets()[name].get("description", {})
+                if isinstance(desc_data, dict):
+                    desc = desc_data.get("text", "")
+                else:
+                    desc = str(desc_data) if desc_data else ""
             result.append({"name": name, "description": desc})
         return result
 
