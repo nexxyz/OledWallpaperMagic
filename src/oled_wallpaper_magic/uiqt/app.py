@@ -205,6 +205,7 @@ class ConfigPanelMixin:
         self.preset_combo.wheelEvent = self._disable_wheel
         self.preset_name_edit = QLineEdit("")
         self.preset_name_edit.setPlaceholderText("preset name")
+        self.preset_name_edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self.curve_param = self._dspin(0.1, 10.0, self.config.generation.curve_param, 0.1)
         self.glow_strength = self._dspin(0.0, 1.5, self.config.generation.glow_strength, 0.05)
@@ -224,11 +225,13 @@ class ConfigPanelMixin:
         self.workers_spin = self._spin(0, 64, self.config.generation.workers)
 
         self.save_dir_edit = QLineEdit(str(self.config.session.save_dir))
+        self.save_dir_edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.save_dir_browse_btn = QPushButton("Browse")
 
         self.seed_edit = QLineEdit("")
         self.seed_edit.setPlaceholderText("blank = random")
         self.seed_edit.setValidator(QIntValidator())
+        self.seed_edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self.screen_res_btn = QPushButton("Use Current Screen Resolution")
         self.screen_res_btn.clicked.connect(self.use_current_screen_resolution)
@@ -824,6 +827,7 @@ class ConfigPanelMixin:
         w = QSpinBox()
         w.setRange(lo, hi)
         w.setValue(value)
+        w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         w.wheelEvent = self._disable_wheel
         return w
 
@@ -832,6 +836,7 @@ class ConfigPanelMixin:
         w.setRange(lo, hi)
         w.setSingleStep(step)
         w.setValue(value)
+        w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         w.wheelEvent = self._disable_wheel
         return w
 
@@ -840,6 +845,8 @@ class ConfigPanelMixin:
 
     def _hex_edit(self, value: str) -> QLineEdit:
         w = QLineEdit(value)
+        w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        return w
         w.setPlaceholderText("#AABBCC")
         return w
 

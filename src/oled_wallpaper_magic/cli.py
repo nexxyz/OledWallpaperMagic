@@ -303,8 +303,19 @@ def gui() -> None:
     launch_qt_gui()
 
 
+@app.command("cli")
+def cli_mode() -> None:
+    """Run in CLI mode (for scripting/batch processing)."""
+    pass
+
+
 def main() -> None:
-    app()
+    import sys
+
+    if len(sys.argv) == 1 or len(sys.argv) == 2 and sys.argv[1] == "gui":
+        gui()
+    else:
+        app()
 
 
 if __name__ == "__main__":
