@@ -1,32 +1,40 @@
-import pytest
-from pathlib import Path
-import json
 import tempfile
+from pathlib import Path
 
-from oled_wallpaper_magic.presets import preset_store, PresetData, PresetStore
+from oled_wallpaper_magic.presets import PresetStore
 
 
 class TestPresetStore:
     """Test preset loading and saving - HIGH risk: broken presets = broken workflow"""
 
+    def _store(self) -> PresetStore:
+        td = tempfile.TemporaryDirectory()
+        store = PresetStore(user_dir=Path(td.name) / "presets")
+        self._tmp_dir = td
+        return store
+
     def test_preset_store_lists_builtins(self):
-        presets = preset_store.list_presets()
+        store = self._store()
+        presets = store.list_presets()
         names = [p["name"] for p in presets]
         assert "minimal" in names
         assert "dense" in names
         assert "awesome_bubbles" in names
 
     def test_preset_get_valid_builtin(self):
-        preset = preset_store.get("awesome_bubbles")
+        store = self._store()
+        preset = store.get("awesome_bubbles")
         assert preset is not None
         assert preset.name == "awesome_bubbles"
 
     def test_preset_get_invalid(self):
-        preset = preset_store.get("nonexistent_preset")
+        store = self._store()
+        preset = store.get("nonexistent_preset")
         assert preset is None
 
     def test_preset_to_config(self):
-        preset = preset_store.get("minimal")
+        store = self._store()
+        preset = store.get("minimal")
         assert preset is not None
 
         config = preset.to_config()
@@ -35,20 +43,24 @@ class TestPresetStore:
         assert config.generation.curve == "gaussian"
 
     def test_preset_to_toml(self):
-        preset = preset_store.get("dense")
+        store = self._store()
+        preset = store.get("dense")
+        assert preset is not None
         toml_str = preset.to_toml()
         assert "min_circles" in toml_str
         assert "max_circles" in toml_str
 
     def test_all_builtins_have_descriptions(self):
-        presets = preset_store.list_presets()
+        store = self._store()
+        presets = store.list_presets()
         for p in presets:
             assert p["description"], f"Preset {p['name']} missing description"
 
     def test_builtin_preset_configs_are_valid(self):
+        store = self._store()
         preset_names = ["minimal", "dense", "ultrawide", "vivid", "subtle"]
         for name in preset_names:
-            preset = preset_store.get(name)
+            preset = store.get(name)
             assert preset is not None, f"Preset {name} not found"
             config = preset.to_config()
             assert config.generation.min_circles <= config.generation.max_circles
@@ -100,9 +112,15 @@ class TestUserPresets:
 
             assert store.get("temp_preset") is None
 
-    def test_preset_delete_builtin_fails(self):
-        result = preset_store.delete("minimal")
-        assert result is False
+    def test_preset_delete_seeded_default(self):
+        with tempfile.TemporaryDirectory() as td:
+            user_dir = Path(td) / "presets"
+            store = PresetStore(user_dir=user_dir)
+
+            assert store.get("minimal") is not None
+            result = store.delete("minimal")
+            assert result is True
+            assert store.get("minimal") is None
 
     def test_list_presets_includes_user(self):
         with tempfile.TemporaryDirectory() as td:
