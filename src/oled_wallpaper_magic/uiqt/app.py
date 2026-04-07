@@ -34,6 +34,7 @@ QApplication = QtWidgets.QApplication
 QCheckBox = QtWidgets.QCheckBox
 QComboBox = QtWidgets.QComboBox
 QFileDialog = QtWidgets.QFileDialog
+QColorDialog = QtWidgets.QColorDialog
 QFrame = QtWidgets.QFrame
 QFormLayout = QtWidgets.QFormLayout
 QGroupBox = QtWidgets.QGroupBox
@@ -224,6 +225,14 @@ class ConfigPanelMixin:
         self.primary_hex = self._hex_edit("#A0C8FF")
         self.secondary_hex = self._hex_edit("#FFC090")
         self.glow_hex = self._hex_edit("#FFF3C8")
+        self.bg_swatch = self._color_swatch()
+        self.primary_swatch = self._color_swatch()
+        self.secondary_swatch = self._color_swatch()
+        self.glow_swatch = self._color_swatch()
+        self.bg_pick_btn = QPushButton("Pick")
+        self.primary_pick_btn = QPushButton("Pick")
+        self.secondary_pick_btn = QPushButton("Pick")
+        self.glow_pick_btn = QPushButton("Pick")
 
         self.randomize_on_generate = QCheckBox("Randomize unlocked during batch")
         self.randomize_on_generate.setChecked(False)
@@ -297,21 +306,17 @@ class ConfigPanelMixin:
         self._add_locked_row("Glow width", self.glow_sigma, "glow_sigma")
         self._add_locked_row("Min opacity", self.opacity_min, "opacity_min")
         self._add_locked_row("Max opacity", self.opacity_max, "opacity_max")
-        self._add_locked_row("Background", self.bg_hex, "background")
+        bg_row = self._color_row(self.bg_hex, self.bg_swatch, self.bg_pick_btn)
+        self._add_locked_row("Background", bg_row, "background")
 
-        pri_row = QWidget()
-        pri_layout = QHBoxLayout(pri_row)
-        pri_layout.setContentsMargins(0, 0, 0, 0)
-        pri_layout.addWidget(self.primary_hex)
+        pri_row = self._color_row(self.primary_hex, self.primary_swatch, self.primary_pick_btn)
         self._add_locked_row("Primary", pri_row, "primary")
 
-        sec_row = QWidget()
-        sec_layout = QHBoxLayout(sec_row)
-        sec_layout.setContentsMargins(0, 0, 0, 0)
-        sec_layout.addWidget(self.secondary_hex)
+        sec_row = self._color_row(self.secondary_hex, self.secondary_swatch, self.secondary_pick_btn)
         self._add_locked_row("Secondary", sec_row, "secondary")
 
-        self._add_locked_row("Glow", self.glow_hex, "glow")
+        glow_row = self._color_row(self.glow_hex, self.glow_swatch, self.glow_pick_btn)
+        self._add_locked_row("Glow", glow_row, "glow")
         self._add_locked_row("Seed", self.seed_edit, "seed")
 
         sep = QFrame()
@@ -368,10 +373,6 @@ class ConfigPanelMixin:
         for w in widgets:
             w.valueChanged.connect(self.schedule_preview)
         self.curve_combo.currentTextChanged.connect(self.schedule_preview)
-        self.bg_hex.editingFinished.connect(self.schedule_preview)
-        self.primary_hex.editingFinished.connect(self.schedule_preview)
-        self.secondary_hex.editingFinished.connect(self.schedule_preview)
-        self.glow_hex.editingFinished.connect(self.schedule_preview)
         self.seed_edit.editingFinished.connect(self.schedule_preview)
 
         self.generate_btn.clicked.connect(self.start_generation)
@@ -382,11 +383,33 @@ class ConfigPanelMixin:
         self.save_preset_btn.clicked.connect(self.save_current_preset)
         self.delete_preset_btn.clicked.connect(self.delete_selected_preset)
         self.restore_defaults_btn.clicked.connect(self.restore_default_presets)
+        self.bg_pick_btn.clicked.connect(
+            lambda: self._pick_color(self.bg_hex, self.bg_swatch, "Background color")
+        )
+        self.primary_pick_btn.clicked.connect(
+            lambda: self._pick_color(self.primary_hex, self.primary_swatch, "Primary color")
+        )
+        self.secondary_pick_btn.clicked.connect(
+            lambda: self._pick_color(self.secondary_hex, self.secondary_swatch, "Secondary color")
+        )
+        self.glow_pick_btn.clicked.connect(
+            lambda: self._pick_color(self.glow_hex, self.glow_swatch, "Glow color")
+        )
         self.randomize_btn.clicked.connect(self.randomize_all_but_resolution)
         self.shuffle_preview_btn.clicked.connect(self.shuffle_preview_seeds)
         self.randomize_per_preview_chk.toggled.connect(self.schedule_preview)
         self.lock_all_btn.clicked.connect(self.lock_all)
         self.unlock_all_btn.clicked.connect(self.unlock_all)
+        self.bg_hex.editingFinished.connect(lambda: self._on_color_hex_finished(self.bg_hex, self.bg_swatch))
+        self.primary_hex.editingFinished.connect(
+            lambda: self._on_color_hex_finished(self.primary_hex, self.primary_swatch)
+        )
+        self.secondary_hex.editingFinished.connect(
+            lambda: self._on_color_hex_finished(self.secondary_hex, self.secondary_swatch)
+        )
+        self.glow_hex.editingFinished.connect(
+            lambda: self._on_color_hex_finished(self.glow_hex, self.glow_swatch)
+        )
 
         self._refresh_preset_names()
         self._refresh_lock_buttons()
@@ -412,6 +435,10 @@ class ConfigPanelMixin:
         self.primary_hex.setToolTip("Primary circle color in hex (e.g. #AABBCC).")
         self.secondary_hex.setToolTip("Secondary circle color in hex (e.g. #AABBCC).")
         self.glow_hex.setToolTip("Glow color in hex.")
+        self.bg_pick_btn.setToolTip("Pick background color")
+        self.primary_pick_btn.setToolTip("Pick primary color")
+        self.secondary_pick_btn.setToolTip("Pick secondary color")
+        self.glow_pick_btn.setToolTip("Pick glow color")
         self.seed_edit.setToolTip("Seed for reproducible output. Blank = random.")
         self.screen_res_btn.setToolTip("Set Width/Height from your current primary display resolution.")
         self.randomize_btn.setToolTip("Randomize unlocked parameters for exploration.")
@@ -715,6 +742,56 @@ class ConfigPanelMixin:
         row = self._wrap_with_lock(widget, key)
         self.form.addRow(label, row)
 
+    def _color_swatch(self) -> QLabel:
+        swatch = QLabel()
+        swatch.setFixedSize(18, 18)
+        swatch.setStyleSheet("border:1px solid #555; border-radius:2px;")
+        return swatch
+
+    def _color_row(self, hex_edit: QLineEdit, swatch: QLabel, pick_btn: QPushButton) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        pick_btn.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        pick_btn.setFixedWidth(52)
+        layout.addWidget(swatch)
+        layout.addWidget(hex_edit, 1)
+        layout.addWidget(pick_btn)
+        return row
+
+    def _set_swatch_from_hex(self, hex_edit: QLineEdit, swatch: QLabel) -> None:
+        try:
+            r, g, b = parse_color(hex_edit.text().strip())
+            swatch.setStyleSheet(
+                f"background:#{r:02X}{g:02X}{b:02X}; border:1px solid #555; border-radius:2px;"
+            )
+        except Exception:
+            swatch.setStyleSheet("background:transparent; border:1px solid #A33; border-radius:2px;")
+
+    def _refresh_color_swatches(self) -> None:
+        self._set_swatch_from_hex(self.bg_hex, self.bg_swatch)
+        self._set_swatch_from_hex(self.primary_hex, self.primary_swatch)
+        self._set_swatch_from_hex(self.secondary_hex, self.secondary_swatch)
+        self._set_swatch_from_hex(self.glow_hex, self.glow_swatch)
+
+    def _on_color_hex_finished(self, hex_edit: QLineEdit, swatch: QLabel) -> None:
+        self._set_swatch_from_hex(hex_edit, swatch)
+        self.schedule_preview()
+
+    def _pick_color(self, hex_edit: QLineEdit, swatch: QLabel, title: str) -> None:
+        try:
+            current = parse_color(hex_edit.text().strip())
+            initial = QtGui.QColor(current[0], current[1], current[2])
+        except Exception:
+            initial = QtGui.QColor(255, 255, 255)
+        chosen = QColorDialog.getColor(initial, self, title)
+        if not chosen.isValid():
+            return
+        hex_edit.setText(chosen.name().upper())
+        self._set_swatch_from_hex(hex_edit, swatch)
+        self.schedule_preview()
+
     def browse_save_dir(self) -> None:
         start = self.save_dir_edit.text().strip() or str(Path.cwd())
         directory = QFileDialog.getExistingDirectory(self, "Select output folder", start)
@@ -765,6 +842,7 @@ class ConfigPanelMixin:
                 self.secondary_hex.setText(f"#{secondary[0]:02X}{secondary[1]:02X}{secondary[2]:02X}")
             else:
                 self.secondary_hex.setText("#FFC090")
+            self._refresh_color_swatches()
 
             self.seed_edit.setText("" if self.config.seed is None else str(self.config.seed))
             self.save_dir_edit.setText(str(self.config.session.save_dir))
@@ -866,7 +944,6 @@ class ConfigPanelMixin:
     def _hex_edit(self, value: str) -> QLineEdit:
         w = QLineEdit(value)
         w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        return w
         w.setPlaceholderText("#AABBCC")
         return w
 
