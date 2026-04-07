@@ -40,6 +40,10 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
 ]
+build = [
+    "pyinstaller>=6.0.0",
+    "pillow>=10.0.0",
+]
 
 [project.scripts]
 owm = "oled_wallpaper_magic.cli:main"
@@ -56,6 +60,7 @@ include = [
     "/src",
     "/presets",
     "/sample",
+    "/icons",
     "/README.md",
     "/CLI.md",
     "/DESIGN.md",
