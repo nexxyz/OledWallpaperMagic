@@ -32,7 +32,7 @@ jobs:
           Compress-Archive -Path "dist\OledWallpaperMagic" -DestinationPath "dist\OledWallpaperMagic-windows.zip" -Force
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/OledWallpaperMagic-windows.zip
           draft: false
