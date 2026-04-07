@@ -4,6 +4,7 @@ import contextlib
 import importlib
 import json
 import random
+import sys
 from pathlib import Path
 
 from oled_wallpaper_magic.config import (
@@ -56,6 +57,12 @@ QWidget = QtWidgets.QWidget
 
 def _random_hex(rng: random.Random) -> str:
     return f"#{rng.randint(0, 255):02X}{rng.randint(0, 255):02X}{rng.randint(0, 255):02X}"
+
+
+def _app_icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "icons" / "icon.png"
+    return Path(__file__).parent.parent.parent / "icons" / "icon.png"
 
 
 def _is_unlocked(key: str, locks: dict[str, bool]) -> bool:
@@ -1118,7 +1125,7 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OledWallpaperMagic")
-        icon_path = Path(__file__).parent.parent.parent / "icons" / "icon.png"
+        icon_path = _app_icon_path()
         if icon_path.exists():
             self.setWindowIcon(QtGui.QIcon(str(icon_path)))
         self.resize(1400, 900)

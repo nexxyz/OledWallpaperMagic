@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from pathlib import Path
 
 _qt_pkg = "".join(["Py", "Side6"])
@@ -38,6 +39,12 @@ STATUS_COLORS = {
 }
 
 
+def _app_icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "icons" / "icon.png"
+    return Path(__file__).parent.parent.parent / "icons" / "icon.png"
+
+
 class ReviewWindow(QMainWindow):
     def __init__(self, session: Session, start_index: int = 0, parent: QWidget | None = None):
         super().__init__(parent)
@@ -50,7 +57,7 @@ class ReviewWindow(QMainWindow):
         self.manager = SessionManager(self.session.root.parent)
 
         self.setWindowTitle(f"OledWallpaperMagic - Review - {session.id}")
-        icon_path = Path(__file__).parent.parent.parent / "icons" / "icon.png"
+        icon_path = _app_icon_path()
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1400, 900)
