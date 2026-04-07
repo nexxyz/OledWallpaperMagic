@@ -19,7 +19,13 @@ Pair it with **Windows Slideshow** (`Settings → Personalize → Background →
 
 ## Getting Started
 
-### Setup
+### Option 1: Download the EXE (Windows)
+
+1. Download the latest release from [GitHub Releases](https://github.com/nexxyz/OledWallpaperMagic/releases/latest)
+2. Extract the ZIP file
+3. Double-click `OledWallpaperMagic.exe` to launch
+
+### Option 2: Run from Source (All Platforms)
 
 ```bash
 # Windows PowerShell
@@ -37,13 +43,9 @@ Requires Python 3.11+.
 
 ### Launch the GUI
 
-The GUI is the fastest way to explore styles and generate batches:
+**EXE:** Double-click `OledWallpaperMagic.exe`
 
-```bash
-owm gui
-```
-
-On Windows, you can also double-click `run_gui.bat` (console-free launch) or `run_gui.vbs`.
+**Source:** Run `owm gui`
 
 The GUI opens with `awesome_bubbles` as the default style. Use the **Randomize** buttons with **lock toggles** to explore controlled variation — lock what you like, randomize what you don't. When you're happy with a look, set your batch count and hit **Generate**.
 
