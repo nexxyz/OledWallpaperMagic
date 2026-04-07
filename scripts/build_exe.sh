@@ -36,19 +36,31 @@ fi
 # Build exe
 echo "Building executable..."
 pyinstaller \
+    --clean \
     --name "OledWallpaperMagic" \
-    --onedir \
+    --onefile \
     --windowed \
     --add-data "$PROJECT_DIR/icons;icons" \
+    --add-data "$PROJECT_DIR/presets;presets" \
+    --collect-all typer \
+    --collect-all click \
+    --collect-all rich \
+    --collect-all pydantic \
+    --collect-all tomli_w \
+    --collect-all shellingham \
+    --hidden-import=PySide6 \
+    --hidden-import=PySide6.QtCore \
+    --hidden-import=PySide6.QtGui \
+    --hidden-import=PySide6.QtWidgets \
     $ICON_ARG \
     "$PROJECT_DIR/src/oled_wallpaper_magic/__main__.py"
 
 echo ""
 echo "=== Build Complete ==="
-echo "Output directory: $DIST_DIR/OledWallpaperMagic"
+echo "Output file: $DIST_DIR/OledWallpaperMagic.exe"
 echo ""
 
 # Show size
-if [ -d "$DIST_DIR/OledWallpaperMagic" ]; then
-    du -sh "$DIST_DIR/OledWallpaperMagic"
+if [ -f "$DIST_DIR/OledWallpaperMagic.exe" ]; then
+    du -sh "$DIST_DIR/OledWallpaperMagic.exe"
 fi
