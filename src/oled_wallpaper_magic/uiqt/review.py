@@ -50,6 +50,9 @@ class ReviewWindow(QMainWindow):
         self.manager = SessionManager(self.session.root.parent)
 
         self.setWindowTitle(f"OledWallpaperMagic - Review - {session.id}")
+        icon_path = Path(__file__).parent.parent.parent / "icons" / "icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1400, 900)
 
         root = QWidget(self)

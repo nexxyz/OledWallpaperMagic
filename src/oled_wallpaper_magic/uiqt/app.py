@@ -1049,6 +1049,9 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OledWallpaperMagic")
+        icon_path = Path(__file__).parent.parent.parent / "icons" / "icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QtGui.QIcon(str(icon_path)))
         self.resize(1400, 900)
         self.config = AppConfig()
         self._apply_default_style()
