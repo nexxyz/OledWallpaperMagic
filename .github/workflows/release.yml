@@ -28,7 +28,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --name "OledWallpaperMagic" --onedir --windowed --add-data "icons;icons" --hidden-import=PySide6 --hidden-import=PySide6.QtCore --hidden-import=PySide6.QtGui --hidden-import=PySide6.QtWidgets src/oled_wallpaper_magic/__main__.py
+          pyinstaller --name "OledWallpaperMagic" --onedir --windowed --add-data "icons;icons" --add-data "presets;presets" --hidden-import=PySide6 --hidden-import=PySide6.QtCore --hidden-import=PySide6.QtGui --hidden-import=PySide6.QtWidgets src/oled_wallpaper_magic/__main__.py
 
       - name: Create ZIP
         run: |

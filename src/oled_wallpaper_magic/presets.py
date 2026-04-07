@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,12 @@ from oled_wallpaper_magic.config import (
     SessionConfig,
 )
 
-BUILTIN_PRESETS_DIR = Path(__file__).parent.parent.parent / "presets"
+if getattr(sys, "frozen", False):
+    _base = Path(sys._MEIPASS)
+else:
+    _base = Path(__file__).parent.parent.parent
+
+BUILTIN_PRESETS_DIR = _base / "presets"
 
 
 class PresetData:
