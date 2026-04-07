@@ -56,7 +56,7 @@ class ReviewWindow(QMainWindow):
         self.generated_dir = self.session.root / "generated"
         self.manager = SessionManager(self.session.root.parent)
 
-        self.setWindowTitle(f"OledWallpaperMagic - Review - {session.id}")
+        self.setWindowTitle(f"OLED Wallpaper Magic - Review - {session.id}")
         icon_path = _app_icon_path()
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))

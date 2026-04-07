@@ -1,4 +1,4 @@
-# Oled Wallpaper Magic
+# OLED Wallpaper Magic
 
 > **Beautiful abstract wallpapers featuring soft, glowing circles against pure black.**
 
@@ -61,7 +61,7 @@ The GUI opens with `awesome_bubbles` as the default style. Use the **Randomize**
 
 ## Presets
 
-Built-in presets ship with OledWallpaperMagic:
+Built-in presets ship with OLED Wallpaper Magic:
 
 | Preset | Description |
 |--------|-------------|

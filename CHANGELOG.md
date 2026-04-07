@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to OledWallpaperMagic will be documented in this file.
+All notable changes to OLED Wallpaper Magic will be documented in this file.
 
 ## [1.0.0] - 2025-04-07
 
