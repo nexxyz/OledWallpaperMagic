@@ -28,10 +28,8 @@ jobs:
           pyinstaller --name "OledWallpaperMagic" --onedir --windowed --add-data "icons;icons" --hidden-import=PySide6 --hidden-import=PySide6.QtCore --hidden-import=PySide6.QtGui --hidden-import=PySide6.QtWidgets src/oled_wallpaper_magic/__main__.py
 
       - name: Create ZIP
-        shell: bash
         run: |
-          cd dist
-          zip -r OledWallpaperMagic-windows.zip OledWallpaperMagic/
+          Compress-Archive -Path "dist\OledWallpaperMagic" -DestinationPath "dist\OledWallpaperMagic-windows.zip" -Force
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
