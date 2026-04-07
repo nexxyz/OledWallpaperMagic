@@ -50,6 +50,7 @@ QSizePolicy = QtWidgets.QSizePolicy
 QSpinBox = QtWidgets.QSpinBox
 QDoubleSpinBox = QtWidgets.QDoubleSpinBox
 QSplitter = QtWidgets.QSplitter
+QStyle = QtWidgets.QStyle
 QToolButton = QtWidgets.QToolButton
 QVBoxLayout = QtWidgets.QVBoxLayout
 QWidget = QtWidgets.QWidget
@@ -261,6 +262,7 @@ class ConfigPanelMixin:
         preset_pick_layout.setContentsMargins(0, 0, 0, 0)
         preset_pick_layout.setSpacing(6)
         preset_pick_layout.addWidget(self.preset_combo)
+        preset_pick_layout.addWidget(self.restore_defaults_btn)
 
         preset_grid.addWidget(preset_pick_row, 0, 0)
         preset_grid.addWidget(self.preset_name_edit, 0, 1)
@@ -379,6 +381,7 @@ class ConfigPanelMixin:
         self.load_preset_btn.clicked.connect(self.apply_selected_preset)
         self.save_preset_btn.clicked.connect(self.save_current_preset)
         self.delete_preset_btn.clicked.connect(self.delete_selected_preset)
+        self.restore_defaults_btn.clicked.connect(self.restore_default_presets)
         self.randomize_btn.clicked.connect(self.randomize_all_but_resolution)
         self.shuffle_preview_btn.clicked.connect(self.shuffle_preview_seeds)
         self.randomize_per_preview_chk.toggled.connect(self.schedule_preview)
@@ -418,7 +421,8 @@ class ConfigPanelMixin:
         self.unlock_all_btn.setToolTip("Unlock every parameter for randomization.")
         self.save_preset_btn.setToolTip("Save current non-batch settings as a custom preset.")
         self.load_preset_btn.setToolTip("Load selected preset (keeps resolution and batch settings).")
-        self.delete_preset_btn.setToolTip("Delete selected user preset.")
+        self.delete_preset_btn.setToolTip("Delete selected preset.")
+        self.restore_defaults_btn.setToolTip("Restore Defaults")
 
         self.count_spin.setToolTip("How many wallpapers to generate in this batch.")
         self.save_dir_edit.setToolTip("Destination folder for kept wallpapers after finalize.")
@@ -499,13 +503,27 @@ class ConfigPanelMixin:
         if not preset_store.delete(name):
             QMessageBox.warning(
                 self,
-                "Cannot delete preset",
-                "Shipped presets cannot be deleted.",
+                "Preset not found",
+                f"Preset '{name}' was not found.",
             )
             return
         self._refresh_preset_names()
         self.preset_name_edit.clear()
         self.schedule_preview()
+
+    def restore_default_presets(self) -> None:
+        confirm = QMessageBox.question(
+            self,
+            "Restore Defaults",
+            "Restore default presets? This will re-add missing default presets.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        restored = preset_store.restore_defaults()
+        self._refresh_preset_names()
+        QMessageBox.information(self, "Restore Defaults", f"Restored {restored} preset(s).")
 
     def _default_lock_state(self) -> dict[str, bool]:
         return {
@@ -1139,7 +1157,6 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self._last_preview_save_dir = Path.cwd()
         self._locks_path = Path.home() / ".config" / "oled_wallpaper_magic" / "randomization_locks.json"
         self._ui_state_path = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_state.json"
-        self._ui_presets_dir = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_presets"
         self._lock_state: dict[str, bool] = self._load_lock_state()
         self._lock_buttons: dict[str, QToolButton] = {}
         self._preset_lookup: dict[str, str] = {}
@@ -1166,6 +1183,12 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self.save_preset_btn = QPushButton("Save Preset")
         self.load_preset_btn = QPushButton("Load Preset")
         self.delete_preset_btn = QPushButton("Delete Preset")
+        self.restore_defaults_btn = QToolButton()
+        self.restore_defaults_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.restore_defaults_btn.setText("")
+        self.restore_defaults_btn.setAutoRaise(True)
+        self.restore_defaults_btn.setFixedSize(24, 24)
+        self.restore_defaults_btn.setIconSize(QtCore.QSize(16, 16))
 
         right = QWidget()
         right_layout = QVBoxLayout(right)

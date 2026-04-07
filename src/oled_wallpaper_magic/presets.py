@@ -15,6 +15,7 @@ from oled_wallpaper_magic.config import (
 _base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent.parent.parent
 
 BUILTIN_PRESETS_DIR = _base / "presets"
+DEFAULTS_SEEDED_MARKER = ".defaults_seeded"
 
 
 class PresetData:
@@ -60,15 +61,35 @@ class PresetStore:
         if user_dir is None:
             user_dir = Path.home() / ".config" / "oledwall" / "presets"
         self.user_dir = user_dir
+        self.config_dir = self.user_dir.parent
+        self._defaults_marker = self.config_dir / DEFAULTS_SEEDED_MARKER
+        self._seed_defaults_on_first_startup()
 
-    def _builtin_presets(self) -> dict[str, dict[str, Any]]:
+    def _builtin_preset_files(self) -> dict[str, Path]:
         if not BUILTIN_PRESETS_DIR.exists():
             return {}
-        result = {}
-        for f in BUILTIN_PRESETS_DIR.glob("*.toml"):
-            with open(f, "rb") as fh:
-                result[f.stem] = tomllib.load(fh)
-        return result
+        return {f.stem: f for f in BUILTIN_PRESETS_DIR.glob("*.toml")}
+
+    def _seed_defaults_on_first_startup(self) -> None:
+        if self._defaults_marker.exists():
+            return
+        self.user_dir.mkdir(parents=True, exist_ok=True)
+        for name, src_path in self._builtin_preset_files().items():
+            dst_path = self.user_dir / f"{name}.toml"
+            if not dst_path.exists():
+                dst_path.write_bytes(src_path.read_bytes())
+        self._defaults_marker.parent.mkdir(parents=True, exist_ok=True)
+        self._defaults_marker.touch(exist_ok=True)
+
+    def restore_defaults(self) -> int:
+        self.user_dir.mkdir(parents=True, exist_ok=True)
+        restored = 0
+        for name, src_path in self._builtin_preset_files().items():
+            dst_path = self.user_dir / f"{name}.toml"
+            if not dst_path.exists():
+                dst_path.write_bytes(src_path.read_bytes())
+                restored += 1
+        return restored
 
     def _user_presets(self) -> dict[str, dict[str, Any]]:
         if not self.user_dir.exists():
@@ -80,29 +101,22 @@ class PresetStore:
         return result
 
     def list_presets(self) -> list[dict[str, str]]:
-        all_names = set(self._builtin_presets().keys()) | set(self._user_presets().keys())
+        user_presets = self._user_presets()
+        all_names = set(user_presets.keys())
         result = []
         for name in sorted(all_names):
-            if name in self._user_presets():
-                desc_data = self._user_presets()[name].get("description", "")
-                if isinstance(desc_data, dict):
-                    desc = desc_data.get("text", "")
-                else:
-                    desc = str(desc_data) if desc_data else ""
+            desc_data = user_presets[name].get("description", "")
+            if isinstance(desc_data, dict):
+                desc = desc_data.get("text", "")
             else:
-                desc_data = self._builtin_presets()[name].get("description", {})
-                if isinstance(desc_data, dict):
-                    desc = desc_data.get("text", "")
-                else:
-                    desc = str(desc_data) if desc_data else ""
+                desc = str(desc_data) if desc_data else ""
             result.append({"name": name, "description": desc})
         return result
 
     def get(self, name: str) -> PresetData | None:
-        if name in self._user_presets():
-            return PresetData(name, self._user_presets()[name])
-        if name in self._builtin_presets():
-            return PresetData(name, self._builtin_presets()[name])
+        user_presets = self._user_presets()
+        if name in user_presets:
+            return PresetData(name, user_presets[name])
         return None
 
     def save(self, name: str, data: dict[str, Any]) -> None:
@@ -114,8 +128,6 @@ class PresetStore:
             tomli_w.dump(data, fh)
 
     def delete(self, name: str) -> bool:
-        if name in self._builtin_presets():
-            return False
         path = self.user_dir / f"{name}.toml"
         if path.exists():
             path.unlink()
