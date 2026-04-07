@@ -1,0 +1,13 @@
+[generation]
+min_circles = 5
+max_circles = 15
+min_radius = 80
+max_radius = 350
+curve = "gaussian"
+curve_param = 2.0
+glow_strength = 0.25
+glow_mu = 0.88
+glow_sigma = 0.07
+
+[description]
+text = "High saturation random colors, medium circles"
