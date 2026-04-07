@@ -2,6 +2,8 @@
 
 > **Beautiful abstract wallpapers featuring soft, glowing circles against pure black.**
 
+[**Download Latest Release**](https://github.com/nexxyz/OledWallpaperMagic/releases/latest)
+
 Generate hundreds of variations, review them in a desktop window, and keep only the best.
 
 Pair it with **Windows Slideshow** (`Settings → Personalize → Background → Slideshow`) to cycle through your kept wallpapers automatically — great for keeping your OLED screen fresh and healthy.
