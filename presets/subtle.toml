@@ -1,0 +1,13 @@
+[generation]
+min_circles = 4
+max_circles = 12
+min_radius = 100
+max_radius = 400
+curve = "gaussian"
+curve_param = 1.8
+glow_strength = 0.15
+glow_mu = 0.88
+glow_sigma = 0.09
+
+[description]
+text = "Low saturation pastels, soft glow"

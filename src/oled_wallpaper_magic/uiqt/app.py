@@ -9,8 +9,6 @@ from pathlib import Path
 from oled_wallpaper_magic.config import (
     DEFAULT_SEED_RANGE,
     AppConfig,
-    ColorConfig,
-    GenerationConfig,
     parse_color,
 )
 from oled_wallpaper_magic.generator.engine import GenerationEngine
@@ -439,15 +437,9 @@ class ConfigPanelMixin:
         self.preset_combo.clear()
         self._preset_lookup = {}
 
-        builtins = [p["name"] for p in preset_store.list_presets()]
-        for name in builtins:
-            display = f"builtin:{name}"
-            self._preset_lookup[display] = ("builtin", name)
-
-        self._ui_presets_dir.mkdir(parents=True, exist_ok=True)
-        for p in sorted(self._ui_presets_dir.glob("*.json")):
-            display = f"user:{p.stem}"
-            self._preset_lookup[display] = ("user", p.stem)
+        for p in preset_store.list_presets():
+            name = p["name"]
+            self._preset_lookup[name] = name
 
         self.preset_combo.addItems(list(self._preset_lookup.keys()))
         if current and current in self._preset_lookup:
@@ -475,21 +467,9 @@ class ConfigPanelMixin:
         }
         data["generation"].pop("workers", None)
 
-        self._ui_presets_dir.mkdir(parents=True, exist_ok=True)
-        path = self._ui_presets_dir / f"{safe}.json"
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        preset_store.save(safe, data)
         self._refresh_preset_names()
-        self.preset_combo.setCurrentText(f"user:{safe}")
-
-    def _load_user_preset(self, name: str) -> dict | None:
-        path = self._ui_presets_dir / f"{name}.json"
-        if not path.exists():
-            return None
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else None
-        except Exception:
-            return None
+        self.preset_combo.setCurrentText(safe)
 
     def _default_lock_state(self) -> dict[str, bool]:
         return {
@@ -764,57 +744,43 @@ class ConfigPanelMixin:
         self._lock_state = merged
         self._refresh_lock_buttons()
 
-    def _load_preset_data(self, entry: tuple) -> AppConfig | None:
-        if entry[0] == "builtin":
-            preset = preset_store.get(entry[1])
-            if preset is None:
-                return None
-            return preset.to_config()
-        else:
-            data = self._load_user_preset(entry[1])
-            if data is None:
-                return None
-            loaded = AppConfig()
-            gen_data = data.get("generation", {}) if isinstance(data.get("generation"), dict) else {}
-            color_data = data.get("colors", {}) if isinstance(data.get("colors"), dict) else {}
-            loaded.generation = GenerationConfig.model_validate(gen_data)
-            loaded.colors = ColorConfig.model_validate(color_data)
-            seed_data = data.get("seed")
-            loaded.seed = int(seed_data) if isinstance(seed_data, int) else None
-            return loaded
+    def _load_preset_data(self, name: str) -> AppConfig | None:
+        preset = preset_store.get(name)
+        if preset is None:
+            return None
+        return preset.to_config()
 
     def apply_selected_preset(self) -> None:
         self._apply_form_to_config()
         key = self.preset_combo.currentText().strip()
-        entry = self._preset_lookup.get(key)
-        if entry is None:
+        if key not in self._preset_lookup:
             QMessageBox.warning(self, "Preset not found", f"Preset '{key}' not found")
             return
 
-        self.preset_name_edit.setText(entry[1])
+        self.preset_name_edit.setText(key)
         preserve = self._preserve_session_fields()
-        loaded = self._load_preset_data(entry)
+        loaded = self._load_preset_data(key)
 
         if loaded is None:
-            QMessageBox.warning(self, "Preset not found", f"Preset '{entry[1]}' not found")
+            QMessageBox.warning(self, "Preset not found", f"Preset '{key}' not found")
             return
 
         self.config.generation = loaded.generation
         self.config.colors = loaded.colors
         self.config.seed = loaded.seed
 
-        lock_data = self._load_user_preset_data(entry, "locks")
+        lock_data = self._load_preset_extra(key, "locks")
         self._apply_preset_locks(lock_data)
 
         self._restore_session_fields(preserve)
         self._sync_form_from_config()
         self.schedule_preview()
 
-    def _load_user_preset_data(self, entry: tuple, key: str):
-        if entry[0] != "user":
+    def _load_preset_extra(self, name: str, key: str):
+        preset = preset_store.get(name)
+        if preset is None:
             return None
-        data = self._load_user_preset(entry[1])
-        return data.get(key) if data else None
+        return preset.data.get(key)
 
     def randomize_all_but_resolution(self) -> None:
         self._apply_form_to_config()
