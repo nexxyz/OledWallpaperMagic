@@ -1,5 +1,7 @@
 name: CI
 
+# Run tests and lint on push/PR to main
+
 on:
   push:
     branches: [main, master]
