@@ -33,7 +33,9 @@ jobs:
 
       - name: Create ZIP
         run: |
-          Compress-Archive -Path "dist\OledWallpaperMagic.exe" -DestinationPath "dist\OledWallpaperMagic-windows.zip" -Force
+          $exeName = "OledWallpaperMagic-${{ github.ref_name }}.exe"
+          Copy-Item "dist\OledWallpaperMagic.exe" "dist\$exeName" -Force
+          Compress-Archive -Path "dist\$exeName" -DestinationPath "dist\OledWallpaperMagic-windows.zip" -Force
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
