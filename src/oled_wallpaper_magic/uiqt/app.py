@@ -60,54 +60,60 @@ def _random_hex(rng: random.Random) -> str:
     return f"#{rng.randint(0, 255):02X}{rng.randint(0, 255):02X}{rng.randint(0, 255):02X}"
 
 
-def _randomize_config_unlocked(base: AppConfig, locks: dict[str, bool], rng: random.Random) -> AppConfig:
-    cfg = base.model_copy(deep=True)
+def _is_unlocked(key: str, locks: dict[str, bool]) -> bool:
+    return not locks.get(key, False)
 
-    def unlocked(key: str) -> bool:
-        return not locks.get(key, False)
 
-    if unlocked("min_circles"):
+def _randomize_generation_params(cfg: AppConfig, locks: dict[str, bool], rng: random.Random) -> None:
+    if _is_unlocked("min_circles", locks):
         cfg.generation.min_circles = rng.randint(1, 30)
-    if unlocked("max_circles"):
+    if _is_unlocked("max_circles", locks):
         cfg.generation.max_circles = rng.randint(max(cfg.generation.min_circles, 2), 100)
-    if unlocked("min_radius"):
+    if _is_unlocked("min_radius", locks):
         cfg.generation.min_radius = rng.randint(10, 500)
-    if unlocked("max_radius"):
+    if _is_unlocked("max_radius", locks):
         cfg.generation.max_radius = rng.randint(max(cfg.generation.min_radius, 50), 2000)
-
-    if unlocked("curve"):
+    if _is_unlocked("curve", locks):
         cfg.generation.curve = rng.choice(["linear", "ease", "exp", "gaussian", "flat"])
-    if unlocked("curve_param"):
+    if _is_unlocked("curve_param", locks):
         cfg.generation.curve_param = round(rng.uniform(0.3, 5.0), 2)
-    if unlocked("glow_strength"):
+    if _is_unlocked("glow_strength", locks):
         cfg.generation.glow_strength = round(rng.uniform(0.0, 1.2), 2)
-    if unlocked("glow_mu"):
+    if _is_unlocked("glow_mu", locks):
         cfg.generation.glow_mu = round(rng.uniform(0.6, 1.0), 2)
-    if unlocked("glow_sigma"):
+    if _is_unlocked("glow_sigma", locks):
         cfg.generation.glow_sigma = round(rng.uniform(0.02, 0.2), 2)
-    if unlocked("opacity_min"):
+    if _is_unlocked("opacity_min", locks):
         cfg.generation.primary_opacity_min = round(rng.uniform(0.0, 0.7), 2)
-    if unlocked("opacity_max"):
+    if _is_unlocked("opacity_max", locks):
         cfg.generation.primary_opacity_max = round(
             rng.uniform(max(cfg.generation.primary_opacity_min, 0.2), 1.0), 2
         )
 
-    if unlocked("background"):
-        cfg.colors.background = (0, 0, 0)
-    if unlocked("glow"):
-        cfg.colors.glow = parse_color(_random_hex(rng))  # type: ignore[assignment]
 
-    if unlocked("primary"):
+def _randomize_color_params(cfg: AppConfig, locks: dict[str, bool], rng: random.Random) -> None:
+    if _is_unlocked("background", locks):
+        cfg.colors.background = (0, 0, 0)
+    if _is_unlocked("glow", locks):
+        cfg.colors.glow = parse_color(_random_hex(rng))  # type: ignore[assignment]
+    if _is_unlocked("primary", locks):
         cfg.colors.primary = parse_color(_random_hex(rng))  # type: ignore[assignment]
         cfg.colors.primary_is_random = False
-
-    if unlocked("secondary"):
+    if _is_unlocked("secondary", locks):
         cfg.colors.secondary = parse_color(_random_hex(rng))  # type: ignore[assignment]
         cfg.colors.secondary_is_random = False
 
-    if unlocked("seed"):
+
+def _randomize_seed(cfg: AppConfig, locks: dict[str, bool], rng: random.Random) -> None:
+    if _is_unlocked("seed", locks):
         cfg.seed = rng.randint(0, DEFAULT_SEED_RANGE)
 
+
+def _randomize_config_unlocked(base: AppConfig, locks: dict[str, bool], rng: random.Random) -> AppConfig:
+    cfg = base.model_copy(deep=True)
+    _randomize_generation_params(cfg, locks, rng)
+    _randomize_color_params(cfg, locks, rng)
+    _randomize_seed(cfg, locks, rng)
     return cfg
 
 
@@ -539,6 +545,54 @@ class ConfigPanelMixin:
             pass
         return state
 
+    def _load_config_from_state(self, data: dict) -> None:
+        cfg_data = data.get("config")
+        if isinstance(cfg_data, dict):
+            with contextlib.suppress(Exception):
+                self.config = AppConfig.model_validate(cfg_data)
+
+    def _load_resolution_from_state(self, data: dict) -> None:
+        explicit_res = data.get("resolution")
+        if isinstance(explicit_res, dict):
+            width = explicit_res.get("width")
+            height = explicit_res.get("height")
+            if isinstance(width, int) and isinstance(height, int):
+                self.config.resolution.width = width
+                self.config.resolution.height = height
+
+    def _load_save_dir_from_state(self, data: dict) -> None:
+        save_dir = data.get("last_preview_save_dir")
+        if isinstance(save_dir, str) and save_dir:
+            self._last_preview_save_dir = Path(save_dir)
+
+    def _load_locks_from_state(self, data: dict) -> None:
+        lock_data = data.get("locks")
+        if isinstance(lock_data, dict):
+            merged = self._default_lock_state()
+            for k, v in lock_data.items():
+                if k in merged:
+                    merged[k] = bool(v)
+            self._lock_state = merged
+
+    def _load_checkbox_states(self, data: dict) -> None:
+        batch_rand = data.get("randomize_on_generate")
+        if isinstance(batch_rand, bool):
+            self.randomize_on_generate.blockSignals(True)
+            self.randomize_on_generate.setChecked(batch_rand)
+            self.randomize_on_generate.blockSignals(False)
+        preview_rand = data.get("randomize_per_preview")
+        if isinstance(preview_rand, bool):
+            self.randomize_per_preview_chk.blockSignals(True)
+            self.randomize_per_preview_chk.setChecked(preview_rand)
+            self.randomize_per_preview_chk.blockSignals(False)
+
+    def _load_preset_name_from_state(self, data: dict) -> None:
+        preset_name = data.get("preset_name")
+        if isinstance(preset_name, str) and preset_name:
+            self.preset_combo.blockSignals(True)
+            self.preset_combo.setCurrentText(preset_name)
+            self.preset_combo.blockSignals(False)
+
     def _load_ui_state(self) -> None:
         try:
             if not self._ui_state_path.exists():
@@ -547,44 +601,12 @@ class ConfigPanelMixin:
             if not isinstance(data, dict):
                 return
 
-            cfg_data = data.get("config")
-            if isinstance(cfg_data, dict):
-                with contextlib.suppress(Exception):
-                    self.config = AppConfig.model_validate(cfg_data)
-
-            explicit_res = data.get("resolution")
-            if isinstance(explicit_res, dict):
-                width = explicit_res.get("width")
-                height = explicit_res.get("height")
-                if isinstance(width, int) and isinstance(height, int):
-                    self.config.resolution.width = width
-                    self.config.resolution.height = height
-
-            save_dir = data.get("last_preview_save_dir")
-            if isinstance(save_dir, str) and save_dir:
-                self._last_preview_save_dir = Path(save_dir)
-            lock_data = data.get("locks")
-            if isinstance(lock_data, dict):
-                merged = self._default_lock_state()
-                for k, v in lock_data.items():
-                    if k in merged:
-                        merged[k] = bool(v)
-                self._lock_state = merged
-            batch_rand = data.get("randomize_on_generate")
-            if isinstance(batch_rand, bool):
-                self.randomize_on_generate.blockSignals(True)
-                self.randomize_on_generate.setChecked(batch_rand)
-                self.randomize_on_generate.blockSignals(False)
-            preview_rand = data.get("randomize_per_preview")
-            if isinstance(preview_rand, bool):
-                self.randomize_per_preview_chk.blockSignals(True)
-                self.randomize_per_preview_chk.setChecked(preview_rand)
-                self.randomize_per_preview_chk.blockSignals(False)
-            preset_name = data.get("preset_name")
-            if isinstance(preset_name, str) and preset_name:
-                self.preset_combo.blockSignals(True)
-                self.preset_combo.setCurrentText(preset_name)
-                self.preset_combo.blockSignals(False)
+            self._load_config_from_state(data)
+            self._load_resolution_from_state(data)
+            self._load_save_dir_from_state(data)
+            self._load_locks_from_state(data)
+            self._load_checkbox_states(data)
+            self._load_preset_name_from_state(data)
             self._refresh_lock_buttons()
             self._sync_form_from_config()
         except Exception:
@@ -713,6 +735,51 @@ class ConfigPanelMixin:
         finally:
             self._loading_form = False
 
+    def _preserve_session_fields(self) -> tuple:
+        return (
+            self.config.resolution.model_copy(deep=True),
+            self.config.session.count,
+            self.config.session.save_dir,
+            self.config.session.temp_dir,
+            self.config.generation.workers,
+        )
+
+    def _restore_session_fields(self, preserve: tuple) -> None:
+        self.config.resolution = preserve[0]
+        self.config.session.count = preserve[1]
+        self.config.session.save_dir = preserve[2]
+        self.config.session.temp_dir = preserve[3]
+        self.config.generation.workers = preserve[4]
+
+    def _apply_preset_locks(self, lock_data: dict | None) -> None:
+        if not isinstance(lock_data, dict):
+            return
+        merged = self._default_lock_state()
+        for k, v in lock_data.items():
+            if k in merged:
+                merged[k] = bool(v)
+        self._lock_state = merged
+        self._refresh_lock_buttons()
+
+    def _load_preset_data(self, entry: tuple) -> AppConfig | None:
+        if entry[0] == "builtin":
+            preset = preset_store.get(entry[1])
+            if preset is None:
+                return None
+            return preset.to_config()
+        else:
+            data = self._load_user_preset(entry[1])
+            if data is None:
+                return None
+            loaded = AppConfig()
+            gen_data = data.get("generation", {}) if isinstance(data.get("generation"), dict) else {}
+            color_data = data.get("colors", {}) if isinstance(data.get("colors"), dict) else {}
+            loaded.generation = GenerationConfig.model_validate(gen_data)
+            loaded.colors = ColorConfig.model_validate(color_data)
+            seed_data = data.get("seed")
+            loaded.seed = int(seed_data) if isinstance(seed_data, int) else None
+            return loaded
+
     def apply_selected_preset(self) -> None:
         self._apply_form_to_config()
         key = self.preset_combo.currentText().strip()
@@ -722,48 +789,29 @@ class ConfigPanelMixin:
             return
 
         self.preset_name_edit.setText(entry[1])
+        preserve = self._preserve_session_fields()
+        loaded = self._load_preset_data(entry)
 
-        preserve_resolution = self.config.resolution.model_copy(deep=True)
-        preserve_count = self.config.session.count
-        preserve_save_dir = self.config.session.save_dir
-        preserve_temp_dir = self.config.session.temp_dir
-        preserve_workers = self.config.generation.workers
+        if loaded is None:
+            QMessageBox.warning(self, "Preset not found", f"Preset '{entry[1]}' not found")
+            return
 
-        if entry[0] == "builtin":
-            preset = preset_store.get(entry[1])
-            if preset is None:
-                QMessageBox.warning(self, "Preset not found", f"Preset '{entry[1]}' not found")
-                return
-            loaded = preset.to_config()
-        else:
-            data = self._load_user_preset(entry[1])
-            if data is None:
-                QMessageBox.warning(self, "Preset not found", f"User preset '{entry[1]}' not found")
-                return
-            loaded = AppConfig()
-            gen_data = data.get("generation", {}) if isinstance(data.get("generation"), dict) else {}
-            color_data = data.get("colors", {}) if isinstance(data.get("colors"), dict) else {}
-            loaded.generation = GenerationConfig.model_validate(gen_data)
-            loaded.colors = ColorConfig.model_validate(color_data)
-            seed_data = data.get("seed")
-            loaded.seed = int(seed_data) if isinstance(seed_data, int) else None
-            lock_data = data.get("locks")
-            if isinstance(lock_data, dict):
-                merged = self._default_lock_state()
-                for k, v in lock_data.items():
-                    if k in merged:
-                        merged[k] = bool(v)
-                self._lock_state = merged
+        self.config.generation = loaded.generation
+        self.config.colors = loaded.colors
+        self.config.seed = loaded.seed
 
-        loaded.resolution = preserve_resolution
-        loaded.session.count = preserve_count
-        loaded.session.save_dir = preserve_save_dir
-        loaded.session.temp_dir = preserve_temp_dir
-        loaded.generation.workers = preserve_workers
-        self.config = loaded
-        self._refresh_lock_buttons()
+        lock_data = self._load_user_preset_data(entry, "locks")
+        self._apply_preset_locks(lock_data)
+
+        self._restore_session_fields(preserve)
         self._sync_form_from_config()
         self.schedule_preview()
+
+    def _load_user_preset_data(self, entry: tuple, key: str):
+        if entry[0] != "user":
+            return None
+        data = self._load_user_preset(entry[1])
+        return data.get(key) if data else None
 
     def randomize_all_but_resolution(self) -> None:
         self._apply_form_to_config()
@@ -795,15 +843,14 @@ class ConfigPanelMixin:
         w.setPlaceholderText("#AABBCC")
         return w
 
-    def _apply_form_to_config(self) -> None:
-        if self._loading_form:
-            return
+    def _apply_resolution_to_config(self) -> None:
         self.config.resolution.width = self.width_spin.value()
         self.config.resolution.height = self.height_spin.value()
         self.config.session.count = self.count_spin.value()
         save_dir_text = self.save_dir_edit.text().strip()
         self.config.session.save_dir = Path(save_dir_text or str(self.config.session.save_dir))
 
+    def _apply_generation_to_config(self) -> None:
         g = self.config.generation
         g.min_circles = self.min_circles.value()
         g.max_circles = self.max_circles.value()
@@ -818,12 +865,15 @@ class ConfigPanelMixin:
         g.primary_opacity_max = self.opacity_max.value()
         g.workers = self.workers_spin.value()
 
+    def _apply_background_color(self) -> None:
         try:
             parsed_bg = parse_color(self.bg_hex.text())
             if isinstance(parsed_bg, tuple):
                 self.config.colors.background = parsed_bg
         except Exception:
             pass
+
+    def _apply_glow_color(self) -> None:
         try:
             parsed_glow = parse_color(self.glow_hex.text())
             if isinstance(parsed_glow, tuple):
@@ -831,6 +881,7 @@ class ConfigPanelMixin:
         except Exception:
             pass
 
+    def _apply_primary_color(self) -> None:
         try:
             parsed_primary = parse_color(self.primary_hex.text())
             if isinstance(parsed_primary, tuple):
@@ -839,6 +890,7 @@ class ConfigPanelMixin:
         except Exception:
             pass
 
+    def _apply_secondary_color(self) -> None:
         try:
             parsed_secondary = parse_color(self.secondary_hex.text())
             if isinstance(parsed_secondary, tuple):
@@ -847,8 +899,23 @@ class ConfigPanelMixin:
         except Exception:
             pass
 
+    def _apply_colors_to_config(self) -> None:
+        self._apply_background_color()
+        self._apply_glow_color()
+        self._apply_primary_color()
+        self._apply_secondary_color()
+
+    def _apply_seed_to_config(self) -> None:
         seed_text = self.seed_edit.text().strip()
         self.config.seed = int(seed_text) if seed_text else None
+
+    def _apply_form_to_config(self) -> None:
+        if self._loading_form:
+            return
+        self._apply_resolution_to_config()
+        self._apply_generation_to_config()
+        self._apply_colors_to_config()
+        self._apply_seed_to_config()
 
 
 class PreviewMixin:
