@@ -25,8 +25,8 @@ if exist "icons\icon.ico" set ICON_ARG=--icon=icons\icon.ico
 
 REM Build exe
 echo Building executable...
-pyinstaller --name "OledWallpaperMagic" --onedir --windowed --add-data "icons;icons" %ICON_ARG% src\oled_wallpaper_magic\__main__.py
+pyinstaller --clean --name "OledWallpaperMagic" --onefile --windowed --add-data "icons;icons" --add-data "presets;presets" --collect-all typer --collect-all click --collect-all rich --collect-all pydantic --collect-all tomli_w --collect-all shellingham --hidden-import=PySide6 --hidden-import=PySide6.QtCore --hidden-import=PySide6.QtGui --hidden-import=PySide6.QtWidgets %ICON_ARG% src\oled_wallpaper_magic\__main__.py
 
 echo.
 echo === Build Complete ===
-echo Output directory: dist\OledWallpaperMagic
+echo Output file: dist\OledWallpaperMagic.exe
