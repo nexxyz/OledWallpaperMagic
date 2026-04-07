@@ -1124,7 +1124,7 @@ class GenerationMixin:
 class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OledWallpaperMagic")
+        self.setWindowTitle("OLED Wallpaper Magic")
         icon_path = _app_icon_path()
         if icon_path.exists():
             self.setWindowIcon(QtGui.QIcon(str(icon_path)))
