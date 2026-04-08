@@ -47,12 +47,19 @@ Requires Python 3.11+.
 
 **Source:** Run `owm gui`
 
-The GUI opens with `awesome_bubbles` as the default style. Use the **Randomize** buttons with **lock toggles** to explore controlled variation — lock what you like, randomize what you don't. When you're happy with a look, set your batch count and hit **Generate**.
+The GUI opens with `awesome_bubbles` as the default style. Use **Randomize All** with lock toggles to explore controlled variation — lock what you like, randomize what you don't. When you're happy with a look, set your batch count and hit **Generate**.
+
+The left config panel is grouped into:
+- **Circle Configuration**
+- **Glow Configuration**
+- **Colors & Seed**
+
+Use the gear button (next to **Use Current Screen Resolution**) to open **Range Limits**. Saving range limits requires an app restart to take effect.
 
 ### General Workflow
 
 1. Set your style in the GUI (or load a preset)
-2. Use **Randomize** + lock toggles to explore controlled variation
+2. Use **Randomize All** + lock toggles to explore controlled variation
 3. Set batch options in **Batch Creation**
 4. Generate and review in the built-in review window
 5. Finalize to export kept wallpapers
