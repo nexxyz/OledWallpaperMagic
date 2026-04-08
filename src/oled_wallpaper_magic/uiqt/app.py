@@ -33,6 +33,8 @@ QIntValidator = QtGui.QIntValidator
 QApplication = QtWidgets.QApplication
 QCheckBox = QtWidgets.QCheckBox
 QComboBox = QtWidgets.QComboBox
+QDialog = QtWidgets.QDialog
+QDialogButtonBox = QtWidgets.QDialogButtonBox
 QFileDialog = QtWidgets.QFileDialog
 QColorDialog = QtWidgets.QColorDialog
 QFrame = QtWidgets.QFrame
@@ -82,14 +84,25 @@ def _randomize_generation_params(cfg: AppConfig, locks: dict[str, bool], rng: ra
         cfg.generation.max_radius = rng.randint(max(cfg.generation.min_radius, 50), 2000)
     if _is_unlocked("curve", locks):
         cfg.generation.curve = rng.choice(["linear", "ease", "exp", "gaussian", "flat"])
-    if _is_unlocked("curve_param", locks):
-        cfg.generation.curve_param = round(rng.uniform(0.3, 5.0), 2)
-    if _is_unlocked("glow_strength", locks):
-        cfg.generation.glow_strength = round(rng.uniform(0.0, 1.2), 2)
-    if _is_unlocked("glow_mu", locks):
-        cfg.generation.glow_mu = round(rng.uniform(0.6, 1.0), 2)
-    if _is_unlocked("glow_sigma", locks):
-        cfg.generation.glow_sigma = round(rng.uniform(0.02, 0.2), 2)
+    if _is_unlocked("curve_param_min", locks):
+        cfg.generation.curve_param_min = round(rng.uniform(0.3, 4.0), 2)
+    if _is_unlocked("curve_param_max", locks):
+        cfg.generation.curve_param_max = round(rng.uniform(cfg.generation.curve_param_min, 6.0), 2)
+    if _is_unlocked("glow_strength_min", locks):
+        cfg.generation.glow_strength_min = round(rng.uniform(0.0, 0.8), 2)
+    if _is_unlocked("glow_strength_max", locks):
+        cfg.generation.glow_strength_max = round(
+            rng.uniform(cfg.generation.glow_strength_min, 1.2),
+            2,
+        )
+    if _is_unlocked("glow_mu_min", locks):
+        cfg.generation.glow_mu_min = round(rng.uniform(0.6, 1.0), 2)
+    if _is_unlocked("glow_mu_max", locks):
+        cfg.generation.glow_mu_max = round(rng.uniform(cfg.generation.glow_mu_min, 1.2), 2)
+    if _is_unlocked("glow_sigma_min", locks):
+        cfg.generation.glow_sigma_min = round(rng.uniform(0.02, 0.12), 2)
+    if _is_unlocked("glow_sigma_max", locks):
+        cfg.generation.glow_sigma_max = round(rng.uniform(cfg.generation.glow_sigma_min, 0.2), 2)
     if _is_unlocked("opacity_min", locks):
         cfg.generation.primary_opacity_min = round(rng.uniform(0.0, 0.7), 2)
     if _is_unlocked("opacity_max", locks):
@@ -190,18 +203,191 @@ class GenerationThread(QThread):
             self.failed.emit(str(exc))
 
 
+class DualRangeSlider(QWidget):
+    values_changed = Signal(int, int)
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._minimum = 0
+        self._maximum = 100
+        self._lower = 25
+        self._upper = 75
+        self._active: str | None = None
+        self._handle_radius = 6
+        self.setMinimumHeight(24)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+    def setRange(self, minimum: int, maximum: int) -> None:
+        self._minimum = minimum
+        self._maximum = max(minimum, maximum)
+        self._lower = max(self._minimum, min(self._lower, self._maximum))
+        self._upper = max(self._lower, min(self._upper, self._maximum))
+        self.update()
+
+    def setValues(self, lower: int, upper: int) -> None:
+        lower = max(self._minimum, min(lower, self._maximum))
+        upper = max(lower, min(upper, self._maximum))
+        if self._lower == lower and self._upper == upper:
+            return
+        self._lower = lower
+        self._upper = upper
+        self.values_changed.emit(self._lower, self._upper)
+        self.update()
+
+    def _track_rect(self):
+        margin = self._handle_radius + 2
+        y = self.height() // 2 - 2
+        return QtCore.QRect(margin, y, max(1, self.width() - 2 * margin), 4)
+
+    def _x_from_value(self, value: int) -> int:
+        rect = self._track_rect()
+        if self._maximum == self._minimum:
+            return rect.left()
+        ratio = (value - self._minimum) / (self._maximum - self._minimum)
+        return rect.left() + int(round(ratio * rect.width()))
+
+    def _value_from_x(self, x: int) -> int:
+        rect = self._track_rect()
+        if rect.width() <= 0:
+            return self._minimum
+        clamped_x = max(rect.left(), min(x, rect.right()))
+        ratio = (clamped_x - rect.left()) / rect.width()
+        return int(round(self._minimum + ratio * (self._maximum - self._minimum)))
+
+    def paintEvent(self, _event) -> None:
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        rect = self._track_rect()
+
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+        p.setBrush(QtGui.QColor("#4A4A4A"))
+        p.drawRoundedRect(rect, 2, 2)
+
+        x1 = self._x_from_value(self._lower)
+        x2 = self._x_from_value(self._upper)
+        selected = QtCore.QRect(min(x1, x2), rect.top(), abs(x2 - x1), rect.height())
+        p.setBrush(QtGui.QColor("#6AA9FF"))
+        p.drawRoundedRect(selected, 2, 2)
+
+        for x in (x1, x2):
+            p.setBrush(QtGui.QColor("#E6E6E6"))
+            p.setPen(QtGui.QPen(QtGui.QColor("#222222"), 1))
+            p.drawEllipse(QtCore.QPoint(x, rect.center().y()), self._handle_radius, self._handle_radius)
+
+    def mousePressEvent(self, event) -> None:
+        x = event.position().toPoint().x()
+        dist_low = abs(x - self._x_from_value(self._lower))
+        dist_up = abs(x - self._x_from_value(self._upper))
+        self._active = "lower" if dist_low <= dist_up else "upper"
+        self.mouseMoveEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._active is None:
+            return
+        v = self._value_from_x(event.position().toPoint().x())
+        if self._active == "lower":
+            self.setValues(v, self._upper)
+        else:
+            self.setValues(self._lower, v)
+
+    def mouseReleaseEvent(self, _event) -> None:
+        self._active = None
+
+
+class RangeLimitsDialog(QDialog):
+    def __init__(self, current: dict[str, float], parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Range Limits")
+        self.setModal(True)
+        self.resize(420, 380)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.setSpacing(6)
+
+        self._fields: dict[str, QLineEdit] = {}
+
+        def add_int(key: str, label: str) -> None:
+            edit = QLineEdit(str(int(current[key])))
+            edit.setValidator(QIntValidator())
+            edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+            self._fields[key] = edit
+            form.addRow(label, edit)
+
+        def add_float(key: str, label: str) -> None:
+            edit = QLineEdit(f"{float(current[key]):.3f}".rstrip("0").rstrip("."))
+            edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+            self._fields[key] = edit
+            form.addRow(label, edit)
+
+        add_int("circles_limit_min", "Circles lower bound")
+        add_int("circles_limit_max", "Circles upper bound")
+        add_int("radius_limit_min", "Radius lower bound")
+        add_int("radius_limit_max", "Radius upper bound")
+        add_float("sharpness_limit_min", "Sharpness lower bound")
+        add_float("sharpness_limit_max", "Sharpness upper bound")
+        add_float("opacity_limit_max", "Opacity max")
+        add_float("glow_strength_limit_max", "Glow strength max")
+        add_float("glow_position_limit_max", "Glow position max")
+        add_float("glow_width_limit_max", "Glow width max")
+        add_int("count_limit_max", "Batch count max")
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def values(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for key, edit in self._fields.items():
+            text = edit.text().strip()
+            if key.endswith("_max") or key.endswith("_min"):
+                if key in {
+                    "count_limit_max",
+                    "circles_limit_min",
+                    "circles_limit_max",
+                    "radius_limit_min",
+                    "radius_limit_max",
+                }:
+                    out[key] = float(int(text))
+                else:
+                    out[key] = float(text)
+        return out
+
+
 class ConfigPanelMixin:
     """Mixin providing config panel UI building and management."""
 
     def _build_controls(self) -> None:
+        limits = self._range_limits
         self.width_spin = self._spin(640, 7680, self.config.resolution.width)
         self.height_spin = self._spin(360, 4320, self.config.resolution.height)
-        self.count_spin = self._spin(1, 300, self.config.session.count)
+        self.count_spin = self._spin(1, int(limits["count_limit_max"]), self.config.session.count)
 
-        self.min_circles = self._spin(1, 50, self.config.generation.min_circles)
-        self.max_circles = self._spin(1, 100, self.config.generation.max_circles)
-        self.min_radius = self._spin(10, 1000, self.config.generation.min_radius)
-        self.max_radius = self._spin(10, 2000, self.config.generation.max_radius)
+        self.min_circles = self._spin(
+            int(limits["circles_limit_min"]),
+            int(limits["circles_limit_max"]),
+            self.config.generation.min_circles,
+        )
+        self.max_circles = self._spin(
+            int(limits["circles_limit_min"]),
+            int(limits["circles_limit_max"]),
+            self.config.generation.max_circles,
+        )
+        self.min_radius = self._spin(
+            int(limits["radius_limit_min"]),
+            int(limits["radius_limit_max"]),
+            self.config.generation.min_radius,
+        )
+        self.max_radius = self._spin(
+            int(limits["radius_limit_min"]),
+            int(limits["radius_limit_max"]),
+            self.config.generation.max_radius,
+        )
 
         self.curve_combo = QComboBox()
         self.curve_combo.addItems(["linear", "ease", "exp", "gaussian", "flat"])
@@ -214,12 +400,66 @@ class ConfigPanelMixin:
         self.preset_name_edit.setPlaceholderText("preset name")
         self.preset_name_edit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
-        self.curve_param = self._dspin(0.1, 10.0, self.config.generation.curve_param, 0.1)
-        self.glow_strength = self._dspin(0.0, 1.5, self.config.generation.glow_strength, 0.05)
-        self.glow_mu = self._dspin(0.0, 1.0, self.config.generation.glow_mu, 0.01)
-        self.glow_sigma = self._dspin(0.01, 0.5, self.config.generation.glow_sigma, 0.01)
-        self.opacity_min = self._dspin(0.0, 1.0, self.config.generation.primary_opacity_min, 0.05)
-        self.opacity_max = self._dspin(0.0, 1.0, self.config.generation.primary_opacity_max, 0.05)
+        self.curve_param_min = self._dspin(
+            limits["sharpness_limit_min"],
+            limits["sharpness_limit_max"],
+            self.config.generation.curve_param_min,
+            0.1,
+        )
+        self.curve_param_max = self._dspin(
+            limits["sharpness_limit_min"],
+            limits["sharpness_limit_max"],
+            self.config.generation.curve_param_max,
+            0.1,
+        )
+        self.glow_strength_min = self._dspin(
+            0.0,
+            limits["glow_strength_limit_max"],
+            self.config.generation.glow_strength_min,
+            0.05,
+        )
+        self.glow_strength_max = self._dspin(
+            0.0,
+            limits["glow_strength_limit_max"],
+            self.config.generation.glow_strength_max,
+            0.05,
+        )
+        self.glow_mu_min = self._dspin(
+            0.0,
+            limits["glow_position_limit_max"],
+            self.config.generation.glow_mu_min,
+            0.01,
+        )
+        self.glow_mu_max = self._dspin(
+            0.0,
+            limits["glow_position_limit_max"],
+            self.config.generation.glow_mu_max,
+            0.01,
+        )
+        self.glow_sigma_min = self._dspin(
+            0.001,
+            limits["glow_width_limit_max"],
+            self.config.generation.glow_sigma_min,
+            0.01,
+        )
+        self.glow_sigma_max = self._dspin(
+            0.001,
+            limits["glow_width_limit_max"],
+            self.config.generation.glow_sigma_max,
+            0.01,
+        )
+        self.opacity_min = self._dspin(
+            0.0,
+            limits["opacity_limit_max"],
+            self.config.generation.primary_opacity_min,
+            0.05,
+        )
+        self.opacity_max = self._dspin(
+            0.0,
+            limits["opacity_limit_max"],
+            self.config.generation.primary_opacity_max,
+            0.05,
+        )
 
         self.bg_hex = self._hex_edit("#000000")
         self.primary_hex = self._hex_edit("#A0C8FF")
@@ -253,7 +493,14 @@ class ConfigPanelMixin:
 
         self.form.addRow("Width", self.width_spin)
         self.form.addRow("Height", self.height_spin)
-        self.form.addRow("", self.screen_res_btn)
+        resolution_tools_row = QWidget()
+        resolution_tools_layout = QHBoxLayout(resolution_tools_row)
+        resolution_tools_layout.setContentsMargins(0, 0, 0, 0)
+        resolution_tools_layout.setSpacing(6)
+        resolution_tools_layout.addWidget(self.screen_res_btn)
+        resolution_tools_layout.addWidget(self.range_limits_btn)
+        resolution_tools_layout.addStretch(1)
+        self.form.addRow("", resolution_tools_row)
 
         top_section = QGroupBox("Presets & Randomization")
         top_layout = QVBoxLayout(top_section)
@@ -284,7 +531,7 @@ class ConfigPanelMixin:
 
         top_layout.addWidget(preset_grid_widget)
 
-        self.randomize_btn = QPushButton("Randomize")
+        self.randomize_btn = QPushButton("Randomize All")
         randomization_row = QWidget()
         randomization_layout = QHBoxLayout(randomization_row)
         randomization_layout.setContentsMargins(0, 0, 0, 0)
@@ -295,29 +542,99 @@ class ConfigPanelMixin:
         randomization_layout.addStretch(1)
         self.form.addRow(top_section)
         self.form.addRow(randomization_row)
-        self._add_locked_row("Min circles", self.min_circles, "min_circles")
-        self._add_locked_row("Max circles", self.max_circles, "max_circles")
-        self._add_locked_row("Min radius", self.min_radius, "min_radius")
-        self._add_locked_row("Max radius", self.max_radius, "max_radius")
-        self._add_locked_row("Curve", self.curve_combo, "curve")
-        self._add_locked_row("Sharpness", self.curve_param, "curve_param")
-        self._add_locked_row("Glow strength", self.glow_strength, "glow_strength")
-        self._add_locked_row("Glow position", self.glow_mu, "glow_mu")
-        self._add_locked_row("Glow width", self.glow_sigma, "glow_sigma")
-        self._add_locked_row("Min opacity", self.opacity_min, "opacity_min")
-        self._add_locked_row("Max opacity", self.opacity_max, "opacity_max")
+
+        circle_section = QGroupBox("Circle Configuration")
+        circle_layout = QVBoxLayout(circle_section)
+        circle_layout.setContentsMargins(10, 12, 10, 10)
+        circle_layout.setSpacing(8)
+        circle_form = QFormLayout()
+        circle_form.setSpacing(6)
+        self._add_locked_row("Curve", self.curve_combo, "curve", target_form=circle_form)
+        self._add_locked_pair_row(
+            "Circles",
+            self.min_circles,
+            self.max_circles,
+            "min_circles",
+            "max_circles",
+            target_form=circle_form,
+        )
+        self._add_locked_pair_row(
+            "Radius",
+            self.min_radius,
+            self.max_radius,
+            "min_radius",
+            "max_radius",
+            target_form=circle_form,
+        )
+        self._add_locked_pair_row(
+            "Sharpness",
+            self.curve_param_min,
+            self.curve_param_max,
+            "curve_param_min",
+            "curve_param_max",
+            target_form=circle_form,
+        )
+        self._add_locked_pair_row(
+            "Opacity",
+            self.opacity_min,
+            self.opacity_max,
+            "opacity_min",
+            "opacity_max",
+            target_form=circle_form,
+        )
+        circle_layout.addLayout(circle_form)
+        self.form.addRow(circle_section)
+
+        glow_section = QGroupBox("Glow Configuration")
+        glow_layout = QVBoxLayout(glow_section)
+        glow_layout.setContentsMargins(10, 12, 10, 10)
+        glow_layout.setSpacing(8)
+        glow_form = QFormLayout()
+        glow_form.setSpacing(6)
+        self._add_locked_pair_row(
+            "Strength",
+            self.glow_strength_min,
+            self.glow_strength_max,
+            "glow_strength_min",
+            "glow_strength_max",
+            target_form=glow_form,
+        )
+        self._add_locked_pair_row(
+            "Position",
+            self.glow_mu_min,
+            self.glow_mu_max,
+            "glow_mu_min",
+            "glow_mu_max",
+            target_form=glow_form,
+        )
+        self._add_locked_pair_row(
+            "Width",
+            self.glow_sigma_min,
+            self.glow_sigma_max,
+            "glow_sigma_min",
+            "glow_sigma_max",
+            target_form=glow_form,
+        )
+        glow_layout.addLayout(glow_form)
+        self.form.addRow(glow_section)
+
+        color_seed_section = QGroupBox("Colors & Seed")
+        color_seed_layout = QVBoxLayout(color_seed_section)
+        color_seed_layout.setContentsMargins(10, 12, 10, 10)
+        color_seed_layout.setSpacing(8)
+        color_seed_form = QFormLayout()
+        color_seed_form.setSpacing(6)
         bg_row = self._color_row(self.bg_hex, self.bg_swatch, self.bg_pick_btn)
-        self._add_locked_row("Background", bg_row, "background")
-
+        self._add_locked_row("Background", bg_row, "background", target_form=color_seed_form)
         pri_row = self._color_row(self.primary_hex, self.primary_swatch, self.primary_pick_btn)
-        self._add_locked_row("Primary", pri_row, "primary")
-
+        self._add_locked_row("Primary", pri_row, "primary", target_form=color_seed_form)
         sec_row = self._color_row(self.secondary_hex, self.secondary_swatch, self.secondary_pick_btn)
-        self._add_locked_row("Secondary", sec_row, "secondary")
-
+        self._add_locked_row("Secondary", sec_row, "secondary", target_form=color_seed_form)
         glow_row = self._color_row(self.glow_hex, self.glow_swatch, self.glow_pick_btn)
-        self._add_locked_row("Glow", glow_row, "glow")
-        self._add_locked_row("Seed", self.seed_edit, "seed")
+        self._add_locked_row("Glow", glow_row, "glow", target_form=color_seed_form)
+        self._add_locked_row("Seed", self.seed_edit, "seed", target_form=color_seed_form)
+        color_seed_layout.addLayout(color_seed_form)
+        self.form.addRow(color_seed_section)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -363,10 +680,14 @@ class ConfigPanelMixin:
             self.max_circles,
             self.min_radius,
             self.max_radius,
-            self.curve_param,
-            self.glow_strength,
-            self.glow_mu,
-            self.glow_sigma,
+            self.curve_param_min,
+            self.curve_param_max,
+            self.glow_strength_min,
+            self.glow_strength_max,
+            self.glow_mu_min,
+            self.glow_mu_max,
+            self.glow_sigma_min,
+            self.glow_sigma_max,
             self.opacity_min,
             self.opacity_max,
         ]
@@ -379,6 +700,7 @@ class ConfigPanelMixin:
         self.open_btn.clicked.connect(self.open_session)
         self.cleanup_btn.clicked.connect(self.cleanup_sessions)
         self.save_dir_browse_btn.clicked.connect(self.browse_save_dir)
+        self.range_limits_btn.clicked.connect(self.open_range_limits_dialog)
         self.load_preset_btn.clicked.connect(self.apply_selected_preset)
         self.save_preset_btn.clicked.connect(self.save_current_preset)
         self.delete_preset_btn.clicked.connect(self.delete_selected_preset)
@@ -425,10 +747,14 @@ class ConfigPanelMixin:
         self.min_radius.setToolTip("Minimum circle radius in pixels.")
         self.max_radius.setToolTip("Maximum circle radius in pixels.")
         self.curve_combo.setToolTip("Falloff curve: flat creates a solid center with hard edge.")
-        self.curve_param.setToolTip("Curve sharpness parameter.")
-        self.glow_strength.setToolTip("Glow intensity around circle edges.")
-        self.glow_mu.setToolTip("Glow ring position as fraction of radius.")
-        self.glow_sigma.setToolTip("Glow ring width.")
+        self.curve_param_min.setToolTip("Minimum curve sharpness parameter.")
+        self.curve_param_max.setToolTip("Maximum curve sharpness parameter.")
+        self.glow_strength_min.setToolTip("Minimum glow intensity around circle edges.")
+        self.glow_strength_max.setToolTip("Maximum glow intensity around circle edges.")
+        self.glow_mu_min.setToolTip("Minimum glow ring position as fraction of radius.")
+        self.glow_mu_max.setToolTip("Maximum glow ring position as fraction of radius.")
+        self.glow_sigma_min.setToolTip("Minimum glow ring width.")
+        self.glow_sigma_max.setToolTip("Maximum glow ring width.")
         self.opacity_min.setToolTip("Minimum per-circle opacity.")
         self.opacity_max.setToolTip("Maximum per-circle opacity.")
         self.bg_hex.setToolTip("Background color in hex (e.g. #000000).")
@@ -441,6 +767,7 @@ class ConfigPanelMixin:
         self.glow_pick_btn.setToolTip("Pick glow color")
         self.seed_edit.setToolTip("Seed for reproducible output. Blank = random.")
         self.screen_res_btn.setToolTip("Set Width/Height from your current primary display resolution.")
+        self.range_limits_btn.setToolTip("Range Limits")
         self.randomize_btn.setToolTip("Randomize unlocked parameters for exploration.")
         self.preset_name_edit.setToolTip("Name for saving a custom preset.")
 
@@ -561,10 +888,14 @@ class ConfigPanelMixin:
             "min_radius": False,
             "max_radius": False,
             "curve": False,
-            "curve_param": False,
-            "glow_strength": False,
-            "glow_mu": False,
-            "glow_sigma": False,
+            "curve_param_min": False,
+            "curve_param_max": False,
+            "glow_strength_min": False,
+            "glow_strength_max": False,
+            "glow_mu_min": False,
+            "glow_mu_max": False,
+            "glow_sigma_min": False,
+            "glow_sigma_max": False,
             "opacity_min": False,
             "opacity_max": False,
             "background": False,
@@ -580,10 +911,14 @@ class ConfigPanelMixin:
         self.config.generation.min_radius = 47
         self.config.generation.max_radius = 1012
         self.config.generation.curve = "linear"
-        self.config.generation.curve_param = 1.14
-        self.config.generation.glow_strength = 0.64
-        self.config.generation.glow_mu = 0.83
-        self.config.generation.glow_sigma = 0.10
+        self.config.generation.curve_param_min = 1.14
+        self.config.generation.curve_param_max = 1.14
+        self.config.generation.glow_strength_min = 0.64
+        self.config.generation.glow_strength_max = 0.64
+        self.config.generation.glow_mu_min = 0.83
+        self.config.generation.glow_mu_max = 0.83
+        self.config.generation.glow_sigma_min = 0.10
+        self.config.generation.glow_sigma_max = 0.10
         self.config.generation.primary_opacity_min = 0.48
         self.config.generation.primary_opacity_max = 1.0
 
@@ -706,12 +1041,18 @@ class ConfigPanelMixin:
 
     def _refresh_lock_buttons(self) -> None:
         for key, btn in self._lock_buttons.items():
-            locked = self._lock_state.get(key, False)
+            keys = self._lock_button_keys.get(key, (key,))
+            locked = all(self._lock_state.get(k, False) for k in keys)
             btn.setText("🔒" if locked else "🔓")
-            btn.setToolTip("Locked: excluded from randomization" if locked else "Unlocked: randomized")
+            btn.setToolTip(
+                "Locked: Within selected range" if locked else "Unlocked: Fully randomized"
+            )
 
     def _toggle_lock(self, key: str) -> None:
-        self._lock_state[key] = not self._lock_state.get(key, False)
+        keys = self._lock_button_keys.get(key, (key,))
+        locked = all(self._lock_state.get(k, False) for k in keys)
+        for item_key in keys:
+            self._lock_state[item_key] = not locked
         self._refresh_lock_buttons()
 
     def lock_all(self) -> None:
@@ -735,12 +1076,145 @@ class ConfigPanelMixin:
         btn.setFixedWidth(28)
         btn.clicked.connect(lambda _=False, k=key: self._toggle_lock(k))
         self._lock_buttons[key] = btn
+        self._lock_button_keys[key] = (key,)
         layout.addWidget(btn)
         return row
 
-    def _add_locked_row(self, label: str, widget: QWidget, key: str) -> None:
+    def _wrap_with_lock_keys(self, widget: QWidget, lock_key: str, keys: tuple[str, ...]) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 10, 0)
+        layout.setSpacing(6)
+        layout.addWidget(widget, 1)
+        btn = QToolButton()
+        btn.setAutoRaise(False)
+        btn.setFixedWidth(28)
+        btn.clicked.connect(lambda _=False, k=lock_key: self._toggle_lock(k))
+        self._lock_buttons[lock_key] = btn
+        self._lock_button_keys[lock_key] = keys
+        layout.addWidget(btn)
+        return row
+
+    def _add_locked_row(
+        self,
+        label: str,
+        widget: QWidget,
+        key: str,
+        target_form: QFormLayout | None = None,
+    ) -> None:
         row = self._wrap_with_lock(widget, key)
-        self.form.addRow(label, row)
+        (target_form or self.form).addRow(label, row)
+
+    def _range_row(self, min_widget: QWidget, max_widget: QWidget) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        min_lbl = QLabel("Min")
+        max_lbl = QLabel("Max")
+        min_lbl.setFixedWidth(24)
+        max_lbl.setFixedWidth(24)
+        layout.addWidget(min_lbl)
+        layout.addWidget(min_widget, 1)
+        layout.addWidget(max_lbl)
+        layout.addWidget(max_widget, 1)
+        return row
+
+    def _bind_pair_slider(
+        self,
+        min_widget: QSpinBox | QDoubleSpinBox,
+        max_widget: QSpinBox | QDoubleSpinBox,
+        slider: DualRangeSlider,
+    ) -> None:
+        factor = 100 if isinstance(min_widget, QDoubleSpinBox) else 1
+
+        slider.setRange(
+            int(round(min_widget.minimum() * factor)),
+            int(round(max_widget.maximum() * factor)),
+        )
+
+        state = {"syncing": False}
+
+        def to_slider(value: float) -> int:
+            return int(round(value * factor))
+
+        def from_slider(value: int) -> float:
+            return value / factor
+
+        def sync_from_widgets() -> None:
+            state["syncing"] = True
+            slider.setValues(to_slider(min_widget.value()), to_slider(max_widget.value()))
+            state["syncing"] = False
+
+        def on_min_widget_changed(_value) -> None:
+            if state["syncing"]:
+                return
+            if min_widget.value() > max_widget.value():
+                max_widget.setValue(min_widget.value())
+            sync_from_widgets()
+
+        def on_max_widget_changed(_value) -> None:
+            if state["syncing"]:
+                return
+            if max_widget.value() < min_widget.value():
+                min_widget.setValue(max_widget.value())
+            sync_from_widgets()
+
+        def on_slider_changed(min_value: int, max_value: int) -> None:
+            if state["syncing"]:
+                return
+            state["syncing"] = True
+            min_f = from_slider(min_value)
+            max_f = from_slider(max_value)
+            if isinstance(min_widget, QSpinBox):
+                min_widget.setValue(int(round(min_f)))
+            else:
+                min_widget.setValue(min_f)
+            if isinstance(max_widget, QSpinBox):
+                max_widget.setValue(int(round(max_f)))
+            else:
+                max_widget.setValue(max_f)
+            if max_widget.value() < min_widget.value():
+                min_widget.setValue(max_widget.value())
+            state["syncing"] = False
+            sync_from_widgets()
+
+        min_widget.valueChanged.connect(on_min_widget_changed)
+        max_widget.valueChanged.connect(on_max_widget_changed)
+        slider.values_changed.connect(on_slider_changed)
+        sync_from_widgets()
+
+    def _add_locked_pair_row(
+        self,
+        label: str,
+        min_widget: QSpinBox | QDoubleSpinBox,
+        max_widget: QSpinBox | QDoubleSpinBox,
+        min_key: str,
+        max_key: str,
+        target_form: QFormLayout | None = None,
+    ) -> None:
+        range_row = self._range_row(min_widget, max_widget)
+
+        range_slider = DualRangeSlider()
+        range_slider.setToolTip(f"{label} range")
+
+        slider_row = QWidget()
+        slider_layout = QHBoxLayout(slider_row)
+        slider_layout.setContentsMargins(0, 0, 0, 0)
+        slider_layout.setSpacing(6)
+        slider_layout.addWidget(QLabel("Range"))
+        slider_layout.addWidget(range_slider, 1)
+
+        self._bind_pair_slider(min_widget, max_widget, range_slider)
+
+        widget = QWidget()
+        widget_layout = QVBoxLayout(widget)
+        widget_layout.setContentsMargins(0, 0, 0, 0)
+        widget_layout.setSpacing(4)
+        widget_layout.addWidget(range_row)
+        widget_layout.addWidget(slider_row)
+        row = self._wrap_with_lock_keys(widget, min_key, (min_key, max_key))
+        (target_form or self.form).addRow(label, row)
 
     def _color_swatch(self) -> QLabel:
         swatch = QLabel()
@@ -756,8 +1230,9 @@ class ConfigPanelMixin:
         pick_btn.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         pick_btn.setFixedWidth(52)
         layout.addWidget(swatch)
-        layout.addWidget(hex_edit, 1)
         layout.addWidget(pick_btn)
+        layout.addWidget(hex_edit)
+        layout.addStretch(1)
         return row
 
     def _set_swatch_from_hex(self, hex_edit: QLineEdit, swatch: QLabel) -> None:
@@ -820,10 +1295,14 @@ class ConfigPanelMixin:
             self.min_radius.setValue(g.min_radius)
             self.max_radius.setValue(g.max_radius)
             self.curve_combo.setCurrentText(g.curve)
-            self.curve_param.setValue(g.curve_param)
-            self.glow_strength.setValue(g.glow_strength)
-            self.glow_mu.setValue(g.glow_mu)
-            self.glow_sigma.setValue(g.glow_sigma)
+            self.curve_param_min.setValue(g.curve_param_min)
+            self.curve_param_max.setValue(g.curve_param_max)
+            self.glow_strength_min.setValue(g.glow_strength_min)
+            self.glow_strength_max.setValue(g.glow_strength_max)
+            self.glow_mu_min.setValue(g.glow_mu_min)
+            self.glow_mu_max.setValue(g.glow_mu_max)
+            self.glow_sigma_min.setValue(g.glow_sigma_min)
+            self.glow_sigma_max.setValue(g.glow_sigma_max)
             self.opacity_min.setValue(g.primary_opacity_min)
             self.opacity_max.setValue(g.primary_opacity_max)
 
@@ -925,6 +1404,7 @@ class ConfigPanelMixin:
         w = QSpinBox()
         w.setRange(lo, hi)
         w.setValue(value)
+        w.setFixedWidth(110)
         w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         w.wheelEvent = self._disable_wheel
         return w
@@ -934,6 +1414,7 @@ class ConfigPanelMixin:
         w.setRange(lo, hi)
         w.setSingleStep(step)
         w.setValue(value)
+        w.setFixedWidth(110)
         w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         w.wheelEvent = self._disable_wheel
         return w
@@ -945,6 +1426,7 @@ class ConfigPanelMixin:
         w = QLineEdit(value)
         w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         w.setPlaceholderText("#AABBCC")
+        w.setFixedWidth(115)
         return w
 
     def _apply_resolution_to_config(self) -> None:
@@ -961,10 +1443,14 @@ class ConfigPanelMixin:
         g.min_radius = self.min_radius.value()
         g.max_radius = self.max_radius.value()
         g.curve = self.curve_combo.currentText()  # type: ignore[assignment]
-        g.curve_param = self.curve_param.value()
-        g.glow_strength = self.glow_strength.value()
-        g.glow_mu = self.glow_mu.value()
-        g.glow_sigma = self.glow_sigma.value()
+        g.curve_param_min = self.curve_param_min.value()
+        g.curve_param_max = self.curve_param_max.value()
+        g.glow_strength_min = self.glow_strength_min.value()
+        g.glow_strength_max = self.glow_strength_max.value()
+        g.glow_mu_min = self.glow_mu_min.value()
+        g.glow_mu_max = self.glow_mu_max.value()
+        g.glow_sigma_min = self.glow_sigma_min.value()
+        g.glow_sigma_max = self.glow_sigma_max.value()
         g.primary_opacity_min = self.opacity_min.value()
         g.primary_opacity_max = self.opacity_max.value()
         g.workers = self.workers_spin.value()
@@ -1025,6 +1511,41 @@ class ConfigPanelMixin:
 class PreviewMixin:
     """Mixin providing preview rendering functionality."""
 
+    def _collapse_preview_ranges(self, cfg: AppConfig, seed: int) -> AppConfig:
+        frozen = cfg.model_copy(deep=True)
+        rng = random.Random(seed ^ 0x5A17)
+        g = frozen.generation
+
+        circles = rng.randint(g.min_circles, g.max_circles)
+        g.min_circles = circles
+        g.max_circles = circles
+
+        radius = rng.randint(g.min_radius, g.max_radius)
+        g.min_radius = radius
+        g.max_radius = radius
+
+        opacity = rng.uniform(g.primary_opacity_min, g.primary_opacity_max)
+        g.primary_opacity_min = opacity
+        g.primary_opacity_max = opacity
+
+        curve_param = rng.uniform(g.curve_param_min, g.curve_param_max)
+        g.curve_param_min = curve_param
+        g.curve_param_max = curve_param
+
+        glow_strength = rng.uniform(g.glow_strength_min, g.glow_strength_max)
+        g.glow_strength_min = glow_strength
+        g.glow_strength_max = glow_strength
+
+        glow_mu = rng.uniform(g.glow_mu_min, g.glow_mu_max)
+        g.glow_mu_min = glow_mu
+        g.glow_mu_max = glow_mu
+
+        glow_sigma = rng.uniform(g.glow_sigma_min, g.glow_sigma_max)
+        g.glow_sigma_min = glow_sigma
+        g.glow_sigma_max = glow_sigma
+
+        return frozen
+
     def schedule_preview(self) -> None:
         if self._loading_form:
             return
@@ -1048,6 +1569,7 @@ class PreviewMixin:
                     self._lock_state,
                     random.Random(self._preview_seeds[i]),
                 )
+            preview_cfg = self._collapse_preview_ranges(preview_cfg, self._preview_seeds[i])
             self._preview_configs.append(preview_cfg.model_copy(deep=True))
             pix = render_preview_pixmap(
                 preview_cfg,
@@ -1234,8 +1756,11 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self._last_preview_save_dir = Path.cwd()
         self._locks_path = Path.home() / ".config" / "oled_wallpaper_magic" / "randomization_locks.json"
         self._ui_state_path = Path.home() / ".config" / "oled_wallpaper_magic" / "ui_state.json"
+        self._range_limits_path = Path.home() / ".config" / "oled_wallpaper_magic" / "range_limits.json"
+        self._range_limits = self._load_range_limits()
         self._lock_state: dict[str, bool] = self._load_lock_state()
         self._lock_buttons: dict[str, QToolButton] = {}
+        self._lock_button_keys: dict[str, tuple[str, ...]] = {}
         self._preset_lookup: dict[str, str] = {}
         self._loading_form = False
 
@@ -1248,7 +1773,7 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setMinimumWidth(520)
+        self.scroll.setMinimumWidth(460)
         left_inner = QWidget()
         self.form = QFormLayout(left_inner)
         self.form.setSpacing(10)
@@ -1266,6 +1791,10 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self.restore_defaults_btn.setAutoRaise(True)
         self.restore_defaults_btn.setFixedSize(24, 24)
         self.restore_defaults_btn.setIconSize(QtCore.QSize(16, 16))
+        self.range_limits_btn = QToolButton()
+        self.range_limits_btn.setText("⚙")
+        self.range_limits_btn.setAutoRaise(False)
+        self.range_limits_btn.setFixedSize(28, 24)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
@@ -1323,7 +1852,7 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         right_layout.addWidget(self.randomize_per_preview_chk)
 
         splitter.addWidget(right)
-        splitter.setSizes([520, 880])
+        splitter.setSizes([460, 940])
 
         self._build_controls()
         self._load_ui_state()
@@ -1337,6 +1866,83 @@ class MainWindow(ConfigPanelMixin, PreviewMixin, GenerationMixin, QMainWindow):
         self._progress = None
 
         self.schedule_preview()
+
+    def _default_range_limits(self) -> dict[str, float]:
+        return {
+            "count_limit_max": 300,
+            "circles_limit_min": 1,
+            "circles_limit_max": 100,
+            "radius_limit_min": 10,
+            "radius_limit_max": 2000,
+            "sharpness_limit_min": 0.1,
+            "sharpness_limit_max": 10.0,
+            "glow_strength_limit_max": 1.5,
+            "glow_position_limit_max": 2.0,
+            "glow_width_limit_max": 0.5,
+            "opacity_limit_max": 1.0,
+        }
+
+    def _validate_range_limits(self, limits: dict[str, float]) -> dict[str, float]:
+        out = self._default_range_limits()
+        out.update(limits)
+
+        out["count_limit_max"] = float(max(1, int(out["count_limit_max"])))
+        out["circles_limit_min"] = float(max(1, int(out["circles_limit_min"])))
+        out["circles_limit_max"] = float(max(int(out["circles_limit_min"]), int(out["circles_limit_max"])))
+        out["radius_limit_min"] = float(max(1, int(out["radius_limit_min"])))
+        out["radius_limit_max"] = float(max(int(out["radius_limit_min"]), int(out["radius_limit_max"])))
+
+        out["sharpness_limit_min"] = max(0.001, float(out["sharpness_limit_min"]))
+        out["sharpness_limit_max"] = max(out["sharpness_limit_min"], float(out["sharpness_limit_max"]))
+        out["glow_strength_limit_max"] = max(0.01, float(out["glow_strength_limit_max"]))
+        out["glow_position_limit_max"] = max(0.01, float(out["glow_position_limit_max"]))
+        out["glow_width_limit_max"] = max(0.001, float(out["glow_width_limit_max"]))
+        out["opacity_limit_max"] = max(0.01, float(out["opacity_limit_max"]))
+        return out
+
+    def _load_range_limits(self) -> dict[str, float]:
+        defaults = self._default_range_limits()
+        try:
+            if not self._range_limits_path.exists():
+                return defaults
+            data = json.loads(self._range_limits_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return defaults
+            parsed = {k: float(v) for k, v in data.items() if k in defaults}
+            return self._validate_range_limits(parsed)
+        except Exception:
+            return defaults
+
+    def _save_range_limits(self) -> None:
+        int_keys = {
+            "count_limit_max",
+            "circles_limit_min",
+            "circles_limit_max",
+            "radius_limit_min",
+            "radius_limit_max",
+        }
+        payload = {
+            k: int(v) if k in int_keys else v
+            for k, v in self._range_limits.items()
+        }
+        self._range_limits_path.parent.mkdir(parents=True, exist_ok=True)
+        self._range_limits_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def open_range_limits_dialog(self) -> None:
+        dialog = RangeLimitsDialog(self._range_limits, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            self._range_limits = self._validate_range_limits(dialog.values())
+            self._save_range_limits()
+        except Exception as exc:
+            QMessageBox.warning(self, "Range limits not saved", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "Restart Required",
+            "Range limits were saved. Please restart the app for changes to take effect.",
+        )
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

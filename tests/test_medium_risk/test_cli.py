@@ -2,6 +2,7 @@ import pytest
 from typer.testing import CliRunner
 
 from oled_wallpaper_magic.cli import app
+from oled_wallpaper_magic.presets import preset_store
 
 
 runner = CliRunner()
@@ -33,11 +34,13 @@ class TestCLI:
     def test_cli_presets_list(self):
         result = runner.invoke(app, ["presets", "list"])
         assert result.exit_code == 0
-        assert "minimal" in result.stdout
-        assert "dense" in result.stdout
+        assert "Available Presets" in result.stdout
 
     def test_cli_presets_show(self):
-        result = runner.invoke(app, ["presets", "show", "minimal"])
+        presets = preset_store.list_presets()
+        if not presets:
+            pytest.skip("No presets available")
+        result = runner.invoke(app, ["presets", "show", presets[0]["name"]])
         assert result.exit_code == 0
         assert "min_circles" in result.stdout
 

@@ -44,15 +44,38 @@ class GenerationConfig(BaseModel):
     min_radius: int = Field(default=60, ge=1)
     max_radius: int = Field(default=400, ge=1)
     curve: Literal["linear", "ease", "exp", "gaussian", "flat"] = "gaussian"
-    curve_param: float = Field(default=2.0, gt=0)
-    glow_strength: float = Field(default=0.3, ge=0)
-    glow_mu: float = Field(default=0.88, ge=0, le=2)
-    glow_sigma: float = Field(default=0.07, gt=0)
+    curve_param_min: float = Field(default=2.0, gt=0)
+    curve_param_max: float = Field(default=2.0, gt=0)
+    glow_strength_min: float = Field(default=0.3, ge=0)
+    glow_strength_max: float = Field(default=0.3, ge=0)
+    glow_mu_min: float = Field(default=0.88, ge=0, le=2)
+    glow_mu_max: float = Field(default=0.88, ge=0, le=2)
+    glow_sigma_min: float = Field(default=0.07, gt=0)
+    glow_sigma_max: float = Field(default=0.07, gt=0)
     primary_opacity_min: float = Field(default=0.4, ge=0, le=1)
     primary_opacity_max: float = Field(default=1.0, ge=0, le=1)
     primary_secondary_mix: float = Field(default=0.5, ge=0, le=1)
     enforce_both_colors: bool = True
     workers: int = Field(default=1, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def compat_legacy_glow_fields(cls, data: Any):
+        if not isinstance(data, dict):
+            return data
+        if "curve_param" in data:
+            data.setdefault("curve_param_min", data["curve_param"])
+            data.setdefault("curve_param_max", data["curve_param"])
+        if "glow_strength" in data:
+            data.setdefault("glow_strength_min", data["glow_strength"])
+            data.setdefault("glow_strength_max", data["glow_strength"])
+        if "glow_mu" in data:
+            data.setdefault("glow_mu_min", data["glow_mu"])
+            data.setdefault("glow_mu_max", data["glow_mu"])
+        if "glow_sigma" in data:
+            data.setdefault("glow_sigma_min", data["glow_sigma"])
+            data.setdefault("glow_sigma_max", data["glow_sigma"])
+        return data
 
     @model_validator(mode="after")
     def check_ranges(self):
@@ -64,6 +87,22 @@ class GenerationConfig(BaseModel):
             min_op = self.primary_opacity_min
             max_op = self.primary_opacity_max
             raise ValueError(f"primary_opacity_min ({min_op}) must be <= primary_opacity_max ({max_op})")
+        if not self.curve_param_min <= self.curve_param_max:
+            raise ValueError(
+                "curve_param_min "
+                f"({self.curve_param_min}) must be <= curve_param_max ({self.curve_param_max})"
+            )
+        if not self.glow_strength_min <= self.glow_strength_max:
+            raise ValueError(
+                "glow_strength_min "
+                f"({self.glow_strength_min}) must be <= glow_strength_max ({self.glow_strength_max})"
+            )
+        if not self.glow_mu_min <= self.glow_mu_max:
+            raise ValueError(f"glow_mu_min ({self.glow_mu_min}) must be <= glow_mu_max ({self.glow_mu_max})")
+        if not self.glow_sigma_min <= self.glow_sigma_max:
+            raise ValueError(
+                f"glow_sigma_min ({self.glow_sigma_min}) must be <= glow_sigma_max ({self.glow_sigma_max})"
+            )
         return self
 
 
