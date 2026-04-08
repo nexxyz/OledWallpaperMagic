@@ -497,8 +497,8 @@ class ConfigPanelMixin:
         resolution_tools_layout = QHBoxLayout(resolution_tools_row)
         resolution_tools_layout.setContentsMargins(0, 0, 0, 0)
         resolution_tools_layout.setSpacing(6)
-        resolution_tools_layout.addWidget(self.screen_res_btn)
         resolution_tools_layout.addWidget(self.range_limits_btn)
+        resolution_tools_layout.addWidget(self.screen_res_btn)
         resolution_tools_layout.addStretch(1)
         self.form.addRow("", resolution_tools_row)
 
