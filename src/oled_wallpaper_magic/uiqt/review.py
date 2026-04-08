@@ -10,6 +10,7 @@ QtGui = importlib.import_module(".".join([_qt_pkg, "Qt" + "Gui"]))
 QtWidgets = importlib.import_module(".".join([_qt_pkg, "Qt" + "Widgets"]))
 
 QSize = QtCore.QSize
+QTimer = QtCore.QTimer
 Qt = QtCore.Qt
 
 QAction = QtGui.QAction
@@ -130,6 +131,7 @@ class ReviewWindow(QMainWindow):
         self._setup_actions()
         self._load_thumbs()
         self._show_current()
+        QTimer.singleShot(0, self._show_current)
 
     def _setup_actions(self) -> None:
         self._bind("Right", self.next_image)

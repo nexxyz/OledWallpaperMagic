@@ -60,8 +60,12 @@ def _render_array(cfg: AppConfig, seed: int, width: int, height: int) -> np.ndar
 
         dist = np.sqrt((x_coords - cx) ** 2 + (y_coords - cy) ** 2)
         t = dist / radius
-        fill_alpha = alpha_fn(t, gc.curve_param) * opacity
-        glow_alpha = glow_ring_alpha(t, gc.glow_mu, gc.glow_sigma) * gc.glow_strength
+        curve_param = rng.uniform(gc.curve_param_min, gc.curve_param_max)
+        glow_strength = rng.uniform(gc.glow_strength_min, gc.glow_strength_max)
+        fill_alpha = alpha_fn(t, curve_param) * opacity
+        glow_mu = rng.uniform(gc.glow_mu_min, gc.glow_mu_max)
+        glow_sigma = rng.uniform(gc.glow_sigma_min, gc.glow_sigma_max)
+        glow_alpha = glow_ring_alpha(t, glow_mu, glow_sigma) * glow_strength
 
         fill_color = np.array(circle_colors[i], dtype=np.float32)
         glow_color_np = np.array(palette.glow, dtype=np.float32)

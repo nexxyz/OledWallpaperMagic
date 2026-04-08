@@ -35,9 +35,10 @@ class TestIntegration:
 
     def test_e2e_gen_with_preset_works(self, temp_dir):
         """Test that generating with a preset works."""
-        from oled_wallpaper_magic.presets import preset_store
+        from oled_wallpaper_magic.presets import PresetStore
 
-        preset = preset_store.get("minimal")
+        store = PresetStore(user_dir=temp_dir / "presets")
+        preset = store.get("minimal")
         assert preset is not None
 
         config = preset.to_config()

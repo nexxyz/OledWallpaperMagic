@@ -55,10 +55,14 @@ def _render_single(args: tuple) -> tuple:
         min_radius,
         max_radius,
         curve,
-        curve_param,
-        glow_strength,
-        glow_mu,
-        glow_sigma,
+        curve_param_min,
+        curve_param_max,
+        glow_strength_min,
+        glow_strength_max,
+        glow_mu_min,
+        glow_mu_max,
+        glow_sigma_min,
+        glow_sigma_max,
         primary_opacity_min,
         primary_opacity_max,
         primary_secondary_mix,
@@ -97,6 +101,12 @@ def _render_single(args: tuple) -> tuple:
         cy = rng.uniform(0, height)
         radius = rng.randint(min_radius, max_radius)
         opacity = rng.uniform(primary_opacity_min, primary_opacity_max)
+
+        glow_mu = rng.uniform(glow_mu_min, glow_mu_max)
+        glow_sigma = rng.uniform(glow_sigma_min, glow_sigma_max)
+
+        curve_param = rng.uniform(curve_param_min, curve_param_max)
+        glow_strength = rng.uniform(glow_strength_min, glow_strength_max)
 
         circle = FuzzyCircle(
             cx=cx,
@@ -159,10 +169,14 @@ class GenerationEngine:
                 self.gen_cfg.min_radius,
                 self.gen_cfg.max_radius,
                 self.gen_cfg.curve,
-                self.gen_cfg.curve_param,
-                self.gen_cfg.glow_strength,
-                self.gen_cfg.glow_mu,
-                self.gen_cfg.glow_sigma,
+                self.gen_cfg.curve_param_min,
+                self.gen_cfg.curve_param_max,
+                self.gen_cfg.glow_strength_min,
+                self.gen_cfg.glow_strength_max,
+                self.gen_cfg.glow_mu_min,
+                self.gen_cfg.glow_mu_max,
+                self.gen_cfg.glow_sigma_min,
+                self.gen_cfg.glow_sigma_max,
                 self.gen_cfg.primary_opacity_min,
                 self.gen_cfg.primary_opacity_max,
                 self.gen_cfg.primary_secondary_mix,
