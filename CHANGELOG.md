@@ -2,6 +2,19 @@
 
 All notable changes to OLED Wallpaper Magic will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Dual-handle range sliders for paired min/max parameters in the main UI.
+- Range Limits modal (gear button) to edit parameter bounds; saved limits apply after restart.
+- Restore-default-presets icon button in preset controls.
+
+### Changed
+- Main parameter layout grouped into Circle Configuration, Glow Configuration, and Colors & Seed.
+- Randomize button renamed to "Randomize All".
+- Freeze Preview now collapses parameter ranges to exact preview values before locking.
+- Preset handling now seeds defaults on first startup and supports restoring missing defaults.
+
 ## [1.0.0] - 2025-04-07
 
 ### Added

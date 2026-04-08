@@ -125,7 +125,7 @@ owm presets list
 # Show a preset's full configuration
 owm presets show ultrawide
 
-# Delete a preset (shipped presets cannot be deleted)
+# Delete a preset
 owm presets delete my-preset
 ```
 
